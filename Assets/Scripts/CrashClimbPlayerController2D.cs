@@ -48,6 +48,7 @@ namespace CrashClimb
         [Header("Animation")]
         [SerializeField] private Animator animator;
         [SerializeField] private SpriteRenderer spriteRenderer;
+        [SerializeField] private CrashClimbSpriteAnimator2D spriteAnimator;
 
         private Rigidbody2D rb;
         private Collider2D bodyCollider;
@@ -74,6 +75,7 @@ namespace CrashClimb
             bodyCollider = GetComponent<Collider2D>();
             animator = animator != null ? animator : GetComponentInChildren<Animator>();
             spriteRenderer = spriteRenderer != null ? spriteRenderer : GetComponentInChildren<SpriteRenderer>();
+            spriteAnimator = spriteAnimator != null ? spriteAnimator : GetComponentInChildren<CrashClimbSpriteAnimator2D>();
             attackPoint = attackPoint != null ? attackPoint : transform.Find("Attack Point");
             currentHealth = maxHealth;
             baseGravityScale = Mathf.Approximately(rb.gravityScale, 0f) ? 3f : rb.gravityScale;
@@ -225,6 +227,7 @@ namespace CrashClimb
 
             nextAttackTime = Time.time + attackCooldown;
             animator?.SetTrigger("Attack");
+            spriteAnimator?.PlayAttack();
 
             Vector2 attackDirection = transform.localScale.x >= 0f ? Vector2.right : Vector2.left;
             Vector2 center = attackPoint != null ? attackPoint.position : (Vector2)transform.position + attackDirection * 0.75f;
@@ -276,6 +279,7 @@ namespace CrashClimb
             currentHealth -= amount;
             rb.linearVelocity = knockback;
             animator?.SetTrigger("Hurt");
+            spriteAnimator?.PlayHurt();
 
             if (currentHealth <= 0)
             {
@@ -320,6 +324,7 @@ namespace CrashClimb
             rb.gravityScale = baseGravityScale;
             transform.position = respawnPoint != null ? respawnPoint.position : Vector3.zero;
             animator?.SetTrigger("Respawn");
+            spriteAnimator?.PlayIdle();
         }
 
         private void UpdateFacing()
@@ -337,6 +342,8 @@ namespace CrashClimb
 
         private void UpdateAnimator()
         {
+            spriteAnimator?.SetMotion(Mathf.Abs(rb.linearVelocity.x), isGrounded, isChargingJump);
+
             if (animator == null)
             {
                 return;

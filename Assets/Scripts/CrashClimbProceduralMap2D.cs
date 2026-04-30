@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CrashClimb
@@ -7,7 +8,7 @@ namespace CrashClimb
         [Header("Map")]
         [SerializeField] private int platformCount = 32;
         [SerializeField] private float verticalSpacing = 1.65f;
-        [SerializeField] private float towerHalfWidth = 4.4f;
+        [SerializeField] private float towerHalfWidth = 4.1f;
         [SerializeField] private Vector2 platformSize = new Vector2(2.8f, 0.34f);
         [SerializeField] private bool buildOnStart = true;
 
@@ -19,13 +20,14 @@ namespace CrashClimb
         [SerializeField] private Material platformMaterial;
         [SerializeField] private Camera sceneCamera;
         [SerializeField] private Color backgroundColor = new Color(0.06f, 0.075f, 0.1f);
+        [SerializeField] private bool useCraftpixSprites = true;
 
         private static readonly Color StoneColor = new Color(0.48f, 0.5f, 0.55f);
         private static readonly Color IceColor = new Color(0.35f, 0.85f, 1f);
         private static readonly Color GlueColor = new Color(0.48f, 0.82f, 0.28f);
         private static readonly Color CrystalColor = new Color(0.75f, 0.32f, 1f);
         private static readonly Color FragileColor = new Color(0.72f, 0.46f, 0.28f);
-        private static readonly Color SpikeColor = new Color(0.92f, 0.12f, 0.16f);
+        private readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
 
         private void OnValidate()
         {
@@ -48,6 +50,7 @@ namespace CrashClimb
         {
             ClearGeneratedChildren();
             SetupCamera();
+            CreateBackground();
             CreateTowerWalls();
             CreatePlatform("Spawn Platform", new Vector2(0f, 0f), new Vector2(7f, 0.5f), CrashClimbSurfaceKind.Stone);
 
@@ -106,7 +109,7 @@ namespace CrashClimb
             }
 
             sceneCamera.orthographic = true;
-            sceneCamera.orthographicSize = 6f;
+            sceneCamera.orthographicSize = 5.3f;
             sceneCamera.backgroundColor = backgroundColor;
             sceneCamera.transform.position = new Vector3(0f, 2.5f, -10f);
         }
@@ -120,12 +123,13 @@ namespace CrashClimb
 
             GameObject player = new GameObject("Crash Player");
             player.transform.position = playerSpawn;
-            player.transform.localScale = new Vector3(0.8f, 1.1f, 1f);
+            player.transform.localScale = new Vector3(1.05f, 1.05f, 1f);
 
             SpriteRenderer renderer = player.AddComponent<SpriteRenderer>();
-            renderer.sprite = CreateUnitSprite();
-            renderer.color = new Color(1f, 0.86f, 0.28f);
+            renderer.sprite = GetSprite("CrashClimb/Wraith_01/PNG Sequences/Idle/Wraith_01_Idle_000", 360f) ?? CreateUnitSprite();
+            renderer.color = Color.white;
             renderer.sortingOrder = 10;
+            player.AddComponent<CrashClimbSpriteAnimator2D>();
 
             Rigidbody2D rb = player.AddComponent<Rigidbody2D>();
             rb.gravityScale = 3f;
@@ -133,11 +137,12 @@ namespace CrashClimb
             rb.freezeRotation = true;
 
             BoxCollider2D collider = player.AddComponent<BoxCollider2D>();
-            collider.size = Vector2.one;
+            collider.size = new Vector2(0.58f, 0.92f);
+            collider.offset = new Vector2(0f, -0.06f);
 
             GameObject attackPoint = new GameObject("Attack Point");
             attackPoint.transform.SetParent(player.transform);
-            attackPoint.transform.localPosition = new Vector3(0.85f, 0f, 0f);
+            attackPoint.transform.localPosition = new Vector3(0.62f, 0f, 0f);
 
             CrashClimbPlayerController2D controller = player.AddComponent<CrashClimbPlayerController2D>();
             return controller;
@@ -162,8 +167,85 @@ namespace CrashClimb
         private void CreateTowerWalls()
         {
             float height = (platformCount + 3) * verticalSpacing;
-            CreatePlatform("Left Wall", new Vector2(-towerHalfWidth - 0.55f, height * 0.5f), new Vector2(0.55f, height), CrashClimbSurfaceKind.Stone);
-            CreatePlatform("Right Wall", new Vector2(towerHalfWidth + 0.55f, height * 0.5f), new Vector2(0.55f, height), CrashClimbSurfaceKind.Stone);
+            CreateWall("Left Wall", new Vector2(-towerHalfWidth - 0.25f, height * 0.5f), new Vector2(0.5f, height));
+            CreateWall("Right Wall", new Vector2(towerHalfWidth + 0.25f, height * 0.5f), new Vector2(0.5f, height));
+        }
+
+        private void CreateWall(string objectName, Vector2 position, Vector2 size)
+        {
+            GameObject wall = new GameObject(objectName);
+            wall.transform.SetParent(transform);
+            wall.transform.position = position;
+            wall.transform.localScale = new Vector3(size.x, size.y, 1f);
+
+            SpriteRenderer renderer = wall.AddComponent<SpriteRenderer>();
+            renderer.sprite = CreateWallSprite();
+            renderer.sortingOrder = 4;
+
+            BoxCollider2D collider = wall.AddComponent<BoxCollider2D>();
+            collider.size = Vector2.one;
+
+            CrashClimbSurface2D surface = wall.AddComponent<CrashClimbSurface2D>();
+            surface.Configure(CrashClimbSurfaceKind.Stone);
+        }
+
+        private void CreateBackground()
+        {
+            if (!useCraftpixSprites)
+            {
+                return;
+            }
+
+            float height = (platformCount + 3) * verticalSpacing;
+            float width = sceneCamera != null ? sceneCamera.orthographicSize * sceneCamera.aspect * 2f : towerHalfWidth * 2f + 2.4f;
+
+            GameObject root = new GameObject("Craftpix Background");
+            root.transform.SetParent(transform);
+            root.transform.position = Vector3.zero;
+
+            CreateBackgroundLayer(root.transform, "Sky", "CrashClimb/Background/Game_Background_1/Sky", width, height, -50);
+            CreateBackgroundLayer(root.transform, "BackGround", "CrashClimb/Background/Game_Background_1/BackGround", width, height, -45);
+            CreateBackgroundLayer(root.transform, "Clouds", "CrashClimb/Background/Game_Background_1/Clouds", width, height, -40);
+            CreateBackgroundLayer(root.transform, "Decor", "CrashClimb/Background/Game_Background_1/Decor", width, height, -35);
+            CreateBackgroundLayer(root.transform, "Sides", "CrashClimb/Background/Game_Background_1/Sides", width, height, -30);
+            CreateStartGround(root.transform, width);
+        }
+
+        private void CreateBackgroundLayer(Transform parent, string objectName, string resourcePath, float targetWidth, float targetHeight, int sortingOrder)
+        {
+            Sprite sprite = GetSprite(resourcePath, 150f);
+            if (sprite == null)
+            {
+                return;
+            }
+
+            GameObject layer = new GameObject(objectName);
+            layer.transform.SetParent(parent);
+            layer.transform.position = new Vector3(0f, targetHeight * 0.5f - 1.2f, 2f);
+            layer.transform.localScale = new Vector3(targetWidth / sprite.bounds.size.x, targetHeight / sprite.bounds.size.y, 1f);
+
+            SpriteRenderer renderer = layer.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sortingOrder = sortingOrder;
+        }
+
+        private void CreateStartGround(Transform parent, float targetWidth)
+        {
+            Sprite sprite = GetSprite("CrashClimb/Background/Game_Background_1/Ground_Start", 150f);
+            if (sprite == null)
+            {
+                return;
+            }
+
+            GameObject ground = new GameObject("Start Ground Art");
+            ground.transform.SetParent(parent);
+            ground.transform.position = new Vector3(0f, -0.45f, 1f);
+            float scale = targetWidth / sprite.bounds.size.x;
+            ground.transform.localScale = new Vector3(scale, scale, 1f);
+
+            SpriteRenderer renderer = ground.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sortingOrder = -8;
         }
 
         private void CreatePlatform(string objectName, Vector2 position, Vector2 size, CrashClimbSurfaceKind kind)
@@ -171,18 +253,24 @@ namespace CrashClimb
             GameObject platform = new GameObject(objectName);
             platform.transform.SetParent(transform);
             platform.transform.position = position;
-            platform.transform.localScale = new Vector3(size.x, size.y, 1f);
 
             SpriteRenderer renderer = platform.AddComponent<SpriteRenderer>();
-            renderer.sprite = CreateUnitSprite();
-            renderer.color = GetSurfaceColor(kind);
+            bool isWall = objectName.Contains("Wall");
+            Sprite platformSprite = useCraftpixSprites && !isWall ? GetPlatformSprite(kind) : null;
+            renderer.sprite = platformSprite != null ? platformSprite : CreateUnitSprite();
+            renderer.color = platformSprite != null ? GetSurfaceTint(kind) : GetSurfaceColor(kind);
+            renderer.sortingOrder = isWall ? -6 : 2;
             if (platformMaterial != null)
             {
                 renderer.material = platformMaterial;
             }
 
+            Vector2 spriteSize = renderer.sprite.bounds.size;
+            float visualHeight = platformSprite != null ? Mathf.Max(size.y, Mathf.Min(0.75f, size.x * spriteSize.y / spriteSize.x)) : size.y;
+            platform.transform.localScale = new Vector3(size.x / spriteSize.x, visualHeight / spriteSize.y, 1f);
+
             BoxCollider2D collider = platform.AddComponent<BoxCollider2D>();
-            collider.size = Vector2.one;
+            collider.size = new Vector2(spriteSize.x, size.y / platform.transform.localScale.y);
 
             CrashClimbSurface2D surface = platform.AddComponent<CrashClimbSurface2D>();
             surface.Configure(kind);
@@ -195,16 +283,22 @@ namespace CrashClimb
             spike.transform.position = position;
 
             SpriteRenderer renderer = spike.AddComponent<SpriteRenderer>();
-            renderer.sprite = CreateTriangleSprite();
-            renderer.color = SpikeColor;
+            renderer.sprite = GetSprite("CrashClimb/Pads/Pad_2_2", 354f) ?? CreateUnitSprite();
+            renderer.color = Color.white;
             renderer.sortingOrder = 5;
+            Vector2 spriteSize = renderer.sprite.bounds.size;
+            spike.transform.localScale = new Vector3(1.28f / spriteSize.x, 0.62f / spriteSize.y, 1f);
 
             PolygonCollider2D collider = spike.AddComponent<PolygonCollider2D>();
             collider.points = new[]
             {
-                new Vector2(-0.42f, -0.28f),
-                new Vector2(0f, 0.42f),
-                new Vector2(0.42f, -0.28f)
+                new Vector2(-0.5f, -0.24f),
+                new Vector2(-0.35f, 0.24f),
+                new Vector2(-0.16f, -0.24f),
+                new Vector2(0f, 0.32f),
+                new Vector2(0.18f, -0.24f),
+                new Vector2(0.36f, 0.24f),
+                new Vector2(0.5f, -0.24f)
             };
             collider.isTrigger = true;
 
@@ -258,6 +352,63 @@ namespace CrashClimb
             }
         }
 
+        private Color GetSurfaceTint(CrashClimbSurfaceKind kind)
+        {
+            switch (kind)
+            {
+                case CrashClimbSurfaceKind.Ice:
+                    return new Color(0.76f, 0.94f, 1f);
+                case CrashClimbSurfaceKind.Glue:
+                    return new Color(0.68f, 0.94f, 0.5f);
+                case CrashClimbSurfaceKind.Crystal:
+                    return new Color(0.9f, 0.7f, 1f);
+                case CrashClimbSurfaceKind.FragileRock:
+                    return new Color(1f, 0.78f, 0.56f);
+                default:
+                    return Color.white;
+            }
+        }
+
+        private Sprite GetPlatformSprite(CrashClimbSurfaceKind kind)
+        {
+            switch (kind)
+            {
+                case CrashClimbSurfaceKind.Ice:
+                    return GetSprite("CrashClimb/Pads/Pad_2_1", 354f);
+                case CrashClimbSurfaceKind.Glue:
+                    return GetSprite("CrashClimb/Pads/Pad_3_2", 397f);
+                case CrashClimbSurfaceKind.Crystal:
+                    return GetSprite("CrashClimb/Pads/Pad_4_1", 395f);
+                case CrashClimbSurfaceKind.FragileRock:
+                    return GetSprite("CrashClimb/Pads/Pad_1_2", 394f);
+                default:
+                    return GetSprite("CrashClimb/Pads/Pad_1_1", 394f);
+            }
+        }
+
+        private Sprite GetSprite(string resourcePath, float pixelsPerUnit)
+        {
+            string cacheKey = $"{resourcePath}:{pixelsPerUnit}";
+            if (spriteCache.TryGetValue(cacheKey, out Sprite cachedSprite))
+            {
+                return cachedSprite;
+            }
+
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null)
+            {
+                return null;
+            }
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit);
+            spriteCache[cacheKey] = sprite;
+            return sprite;
+        }
+
         private Sprite CreateUnitSprite()
         {
             Texture2D texture = new Texture2D(1, 1);
@@ -266,26 +417,24 @@ namespace CrashClimb
             return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
         }
 
-        private Sprite CreateTriangleSprite()
+        private Sprite CreateWallSprite()
         {
             const int size = 32;
             Texture2D texture = new Texture2D(size, size);
             texture.filterMode = FilterMode.Point;
-            Color clear = new Color(1f, 1f, 1f, 0f);
 
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    float normalizedY = y / (float)(size - 1);
-                    float halfWidth = Mathf.Lerp(0.5f, 0f, normalizedY);
-                    float centeredX = Mathf.Abs((x / (float)(size - 1)) - 0.5f);
-                    texture.SetPixel(x, y, centeredX <= halfWidth ? Color.white : clear);
+                    float edge = x < 5 || x > size - 6 ? 0.18f : 0f;
+                    float stripe = Mathf.Sin(y * 0.45f) * 0.04f;
+                    texture.SetPixel(x, y, new Color(0.21f + edge + stripe, 0.15f + edge, 0.12f + edge, 1f));
                 }
             }
 
             texture.Apply();
-            return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.28f), size);
+            return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
         }
     }
 }

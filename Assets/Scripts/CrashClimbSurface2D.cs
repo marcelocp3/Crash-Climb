@@ -64,9 +64,9 @@ namespace CrashClimb
                     breakDelay = 0.35f;
                     break;
                 case CrashClimbSurfaceKind.Glue:
-                    jumpMultiplier = 0.62f;
-                    accelerationMultiplier = 0.72f;
-                    maxSpeedMultiplier = 0.72f;
+                    jumpMultiplier = 0.82f;
+                    accelerationMultiplier = 0.8f;
+                    maxSpeedMultiplier = 0.82f;
                     gravityMultiplier = 1f;
                     breakDelay = 0.35f;
                     break;
