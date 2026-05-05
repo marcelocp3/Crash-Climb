@@ -71,10 +71,10 @@ namespace CrashClimb
                     breakDelay = 0.35f;
                     break;
                 case CrashClimbSurfaceKind.Crystal:
-                    jumpMultiplier = 1.08f;
+                    jumpMultiplier = 1.18f;
                     accelerationMultiplier = 1f;
                     maxSpeedMultiplier = 1f;
-                    gravityMultiplier = -0.72f;
+                    gravityMultiplier = 0.45f;
                     breakDelay = 0.35f;
                     break;
                 case CrashClimbSurfaceKind.FragileRock:

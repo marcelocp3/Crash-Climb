@@ -8,8 +8,8 @@ namespace CrashClimb
         [Header("Map")]
         [SerializeField] private int platformCount = 32;
         [SerializeField] private float verticalSpacing = 1.65f;
-        [SerializeField] private float towerHalfWidth = 4.1f;
-        [SerializeField] private Vector2 platformSize = new Vector2(2.8f, 0.34f);
+        [SerializeField] private float towerHalfWidth = 4.6f;
+        [SerializeField] private Vector2 platformSize = new Vector2(2.65f, 0.34f);
         [SerializeField] private bool buildOnStart = true;
 
         [Header("Player")]
@@ -31,15 +31,15 @@ namespace CrashClimb
 
         private void OnValidate()
         {
-            verticalSpacing = Mathf.Clamp(verticalSpacing, 1.35f, 2.2f);
-            towerHalfWidth = Mathf.Clamp(towerHalfWidth, 3.6f, 5.5f);
-            platformSize.x = Mathf.Clamp(platformSize.x, 2.2f, 4f);
+            verticalSpacing = Mathf.Clamp(verticalSpacing, 1.35f, 2.1f);
+            towerHalfWidth = Mathf.Clamp(towerHalfWidth, 3.8f, 5.4f);
+            platformSize.x = Mathf.Clamp(platformSize.x, 2.15f, 3.6f);
             platformSize.y = Mathf.Clamp(platformSize.y, 0.25f, 0.6f);
         }
 
         private void Start()
         {
-            if (buildOnStart)
+            if (buildOnStart && transform.childCount == 0)
             {
                 Build();
             }
@@ -58,8 +58,8 @@ namespace CrashClimb
             {
                 float progress = i / (float)platformCount;
                 float y = i * verticalSpacing;
-                float sideBias = Mathf.Sin(i * 1.73f) * (towerHalfWidth - 1.4f);
-                float width = Mathf.Lerp(platformSize.x + 0.8f, platformSize.x - 0.45f, progress);
+                float sideBias = GetPlatformX(i);
+                float width = Mathf.Lerp(platformSize.x + 0.45f, platformSize.x - 0.35f, progress);
                 Vector2 size = new Vector2(width, platformSize.y);
                 CrashClimbSurfaceKind kind = PickSurfaceKind(i);
                 CreatePlatform($"Platform {i:00} - {kind}", new Vector2(sideBias, y), size, kind);
@@ -72,14 +72,32 @@ namespace CrashClimb
 
                 if (i % 5 == 0)
                 {
-                    float oppositeX = -Mathf.Sign(sideBias == 0f ? 1f : sideBias) * (towerHalfWidth - 1.2f);
-                    CreatePlatform($"Side Recovery {i:00}", new Vector2(oppositeX, y - 0.9f), new Vector2(1.35f, platformSize.y), CrashClimbSurfaceKind.Stone);
+                    float oppositeX = -Mathf.Sign(sideBias == 0f ? 1f : sideBias) * (towerHalfWidth - 1.65f);
+                    CreatePlatform($"Side Recovery {i:00}", new Vector2(oppositeX, y - 0.85f), new Vector2(1.35f, platformSize.y), CrashClimbSurfaceKind.Stone);
                 }
             }
 
             CreatePlatform("Goal", new Vector2(0f, (platformCount + 1) * verticalSpacing), new Vector2(5f, 0.5f), CrashClimbSurfaceKind.Crystal);
             CrashClimbPlayerController2D player = CreatePlayer();
             AttachCamera(player);
+        }
+
+        [ContextMenu("Apply Platformer Map Defaults")]
+        public void ApplyPlatformerMapDefaults()
+        {
+            platformCount = 32;
+            verticalSpacing = 1.65f;
+            towerHalfWidth = 4.6f;
+            platformSize = new Vector2(2.65f, 0.34f);
+            Build();
+        }
+
+        private float GetPlatformX(int index)
+        {
+            float maxX = towerHalfWidth - 1.55f;
+            float wave = Mathf.Sin(index * 1.35f) * maxX;
+            float correction = Mathf.Sin(index * 0.43f) * 0.45f;
+            return Mathf.Clamp(wave + correction, -maxX, maxX);
         }
 
         private void ClearGeneratedChildren()
@@ -94,6 +112,22 @@ namespace CrashClimb
                 else
                 {
                     DestroyImmediate(child.gameObject);
+                }
+            }
+
+            CrashClimbPlayerController2D[] players = Object.FindObjectsByType<CrashClimbPlayerController2D>(FindObjectsSortMode.None);
+            foreach (CrashClimbPlayerController2D player in players)
+            {
+                if (player != null && player.transform.parent == null && player.gameObject.name.StartsWith("Crash Player"))
+                {
+                    if (Application.isPlaying)
+                    {
+                        Destroy(player.gameObject);
+                    }
+                    else
+                    {
+                        DestroyImmediate(player.gameObject);
+                    }
                 }
             }
         }
@@ -118,10 +152,13 @@ namespace CrashClimb
         {
             if (playerPrefab != null)
             {
-                return Instantiate(playerPrefab, playerSpawn, Quaternion.identity);
+                CrashClimbPlayerController2D prefabPlayer = Instantiate(playerPrefab, playerSpawn, Quaternion.identity);
+                prefabPlayer.transform.SetParent(transform);
+                return prefabPlayer;
             }
 
             GameObject player = new GameObject("Crash Player");
+            player.transform.SetParent(transform);
             player.transform.position = playerSpawn;
             player.transform.localScale = new Vector3(1.05f, 1.05f, 1f);
 

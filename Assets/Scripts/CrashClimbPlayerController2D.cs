@@ -19,12 +19,15 @@ namespace CrashClimb
         [SerializeField] private float groundDrag = 9f;
         [SerializeField] private float airDrag = 1.5f;
 
-        [Header("Oscillating Jump")]
+        [Header("Charged Jump")]
         [SerializeField] private float minJumpForce = 8f;
-        [SerializeField] private float maxJumpForce = 18f;
-        [SerializeField] private float chargeSpeed = 2.8f;
-        [SerializeField] private float horizontalJumpInfluence = 0.9f;
+        [SerializeField] private float maxJumpForce = 16f;
+        [SerializeField] private float maxChargeTime = 0.65f;
         [SerializeField] private float coyoteTime = 0.12f;
+        [SerializeField] private float jumpBufferTime = 0.1f;
+
+        [Header("Surface Effects")]
+        [SerializeField] private float crystalGravityDuration = 1.3f;
 
         [Header("Ground Check")]
         [SerializeField] private LayerMask groundMask = ~0;
@@ -56,6 +59,7 @@ namespace CrashClimb
         private float horizontalInput;
         private float jumpChargeTime;
         private float lastGroundedTime;
+        private float lastJumpPressedTime = -999f;
         private float nextAttackTime;
         private int currentHealth;
         private bool isGrounded;
@@ -63,11 +67,14 @@ namespace CrashClimb
         private bool isDead;
         private bool isInvulnerable;
         private float baseGravityScale;
+        private float surfaceGravityMultiplier = 1f;
+        private float surfaceGravityTimer;
+        private Vector3 spawnPosition;
 
         public int CurrentHealth => currentHealth;
         public int MaxHealth => maxHealth;
         public bool IsGrounded => isGrounded;
-        public float JumpCharge01 => isChargingJump ? Mathf.PingPong(jumpChargeTime * chargeSpeed, 1f) : 0f;
+        public float JumpCharge01 => isChargingJump ? Mathf.Clamp01(jumpChargeTime / maxChargeTime) : 0f;
 
         private void Awake()
         {
@@ -80,6 +87,7 @@ namespace CrashClimb
             currentHealth = maxHealth;
             baseGravityScale = Mathf.Approximately(rb.gravityScale, 0f) ? 3f : rb.gravityScale;
             rb.gravityScale = baseGravityScale;
+            spawnPosition = respawnPoint != null ? respawnPoint.position : transform.position;
         }
 
         private void Update()
@@ -89,7 +97,7 @@ namespace CrashClimb
                 return;
             }
 
-            horizontalInput = Input.GetAxisRaw("Horizontal");
+            horizontalInput = GetHorizontalInput();
             UpdateGroundedState();
             HandleJumpInput();
             HandleAttackInput();
@@ -146,23 +154,26 @@ namespace CrashClimb
 
         private void HandleJumpInput()
         {
-            bool canStartJump = isGrounded || Time.time - lastGroundedTime <= coyoteTime;
-
-            if (JumpPressedThisFrame() && canStartJump)
+            if (JumpPressedThisFrame())
             {
-                isChargingJump = true;
-                jumpChargeTime = 0f;
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x * 0.65f, rb.linearVelocity.y);
+                lastJumpPressedTime = Time.time;
+            }
+
+            bool hasBufferedJump = Time.time - lastJumpPressedTime <= jumpBufferTime;
+            bool canJump = isGrounded || Time.time - lastGroundedTime <= coyoteTime;
+            if (!isChargingJump && hasBufferedJump && canJump)
+            {
+                StartChargingJump();
             }
 
             if (isChargingJump && JumpHeld())
             {
-                jumpChargeTime += Time.deltaTime;
+                jumpChargeTime = Mathf.Min(jumpChargeTime + Time.deltaTime, maxChargeTime);
             }
 
             if (isChargingJump && JumpReleasedThisFrame())
             {
-                ReleaseJump();
+                ReleaseChargedJump();
             }
         }
 
@@ -181,17 +192,36 @@ namespace CrashClimb
             return Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.W) || Input.GetKeyUp(KeyCode.UpArrow);
         }
 
-        private void ReleaseJump()
+        private float GetHorizontalInput()
+        {
+            return Input.GetAxisRaw("Horizontal");
+        }
+
+        private void StartChargingJump()
+        {
+            isChargingJump = true;
+            jumpChargeTime = 0f;
+            lastJumpPressedTime = -999f;
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * 0.5f);
+        }
+
+        private void ReleaseChargedJump()
         {
             float surfaceJumpMultiplier = currentSurface != null ? currentSurface.JumpMultiplier : 1f;
-            float charge = JumpCharge01;
-            float jumpForce = Mathf.Lerp(minJumpForce, maxJumpForce, charge) * surfaceJumpMultiplier;
+            float charge = Mathf.Clamp01(jumpChargeTime / maxChargeTime);
+            float finalJumpForce = Mathf.Lerp(minJumpForce, maxJumpForce, charge) * surfaceJumpMultiplier;
             float gravityDirection = Mathf.Sign(rb.gravityScale);
             Vector2 jumpDirection = gravityDirection >= 0f ? Vector2.up : Vector2.down;
-            Vector2 launchVelocity = jumpDirection * jumpForce;
-            launchVelocity.x += horizontalInput * maxRunSpeed * horizontalJumpInfluence;
-            rb.linearVelocity = launchVelocity;
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpDirection.y * finalJumpForce);
+
+            if (currentSurface != null && currentSurface.Kind == CrashClimbSurfaceKind.Crystal)
+            {
+                surfaceGravityMultiplier = currentSurface.GravityMultiplier;
+                surfaceGravityTimer = crystalGravityDuration;
+            }
+
             isChargingJump = false;
+            jumpChargeTime = 0f;
             lastGroundedTime = -999f;
         }
 
@@ -214,7 +244,17 @@ namespace CrashClimb
 
         private void ApplySurfaceGravity()
         {
-            float multiplier = currentSurface != null && isGrounded ? currentSurface.GravityMultiplier : 1f;
+            if (surfaceGravityTimer > 0f)
+            {
+                surfaceGravityTimer -= Time.fixedDeltaTime;
+            }
+
+            float multiplier = surfaceGravityTimer > 0f ? surfaceGravityMultiplier : 1f;
+            if (isGrounded && currentSurface != null && currentSurface.Kind != CrashClimbSurfaceKind.Crystal)
+            {
+                multiplier = currentSurface.GravityMultiplier;
+            }
+
             rb.gravityScale = baseGravityScale * multiplier;
         }
 
@@ -318,11 +358,14 @@ namespace CrashClimb
         {
             currentHealth = maxHealth;
             isChargingJump = false;
+            jumpChargeTime = 0f;
             isInvulnerable = false;
+            surfaceGravityMultiplier = 1f;
+            surfaceGravityTimer = 0f;
             rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
             rb.gravityScale = baseGravityScale;
-            transform.position = respawnPoint != null ? respawnPoint.position : Vector3.zero;
+            transform.position = respawnPoint != null ? respawnPoint.position : spawnPosition;
             animator?.SetTrigger("Respawn");
             spriteAnimator?.PlayIdle();
         }
