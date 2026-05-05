@@ -31,6 +31,6 @@ Como testar em uma cena nova da Unity:
 
 1. Aperte Play. Se a cena estiver vazia, `CrashClimbBootstrap2D` cria um `GameManager` automaticamente.
 2. O `GameManager` recebe `CrashClimbProceduralMap2D`, que cria câmera, background, plataformas, player e mapa.
-3. Controles padrão: setas/A-D para movimento, segurar e soltar Espaço/W/Seta para cima para pular, Ctrl esquerdo/mouse 0 para ataque.
+3. Controles padrão: setas/A-D para movimento, segurar e soltar Espaço/W/Seta para cima para pular.
 
 Observação: como o jogo não possui inimigos tradicionais, os espinhos entram como inimigos ambientais para a Sprint 2.
