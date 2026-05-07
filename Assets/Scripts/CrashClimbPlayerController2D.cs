@@ -75,6 +75,8 @@ namespace CrashClimb
         public int MaxHealth => maxHealth;
         public bool IsGrounded => isGrounded;
         public float JumpCharge01 => isChargingJump ? Mathf.Clamp01(jumpChargeTime / maxChargeTime) : 0f;
+        public float Height => transform.position.y;
+        public string CurrentSurfaceLabel => currentSurface != null ? GetSurfaceLabel(currentSurface.Kind) : "Ar";
 
         private void Awake()
         {
@@ -368,6 +370,29 @@ namespace CrashClimb
             transform.position = respawnPoint != null ? respawnPoint.position : spawnPosition;
             animator?.SetTrigger("Respawn");
             spriteAnimator?.PlayIdle();
+        }
+
+        public void ResetToSpawn()
+        {
+            StopAllCoroutines();
+            Respawn();
+        }
+
+        private string GetSurfaceLabel(CrashClimbSurfaceKind surfaceKind)
+        {
+            switch (surfaceKind)
+            {
+                case CrashClimbSurfaceKind.Ice:
+                    return "Gelo";
+                case CrashClimbSurfaceKind.Glue:
+                    return "Cola";
+                case CrashClimbSurfaceKind.Crystal:
+                    return "Cristal";
+                case CrashClimbSurfaceKind.FragileRock:
+                    return "Rocha fragil";
+                default:
+                    return "Pedra";
+            }
         }
 
         private void UpdateFacing()

@@ -34,3 +34,16 @@ Como testar em uma cena nova da Unity:
 3. Controles padrão: setas/A-D para movimento, segurar e soltar Espaço/W/Seta para cima para pular.
 
 Observação: como o jogo não possui inimigos tradicionais, os espinhos entram como inimigos ambientais para a Sprint 2.
+
+## Sprint 3 - Level Design, Menu e HUD
+
+Itens implementados:
+
+- Torre completa com 42 plataformas divididas em zonas de desafio: pedra, gelo, cola, rochas quebráveis, cristais e topo final.
+- Player integrado automaticamente ao mapa, com câmera seguindo e respawn no início.
+- Menu inicial com arte do background/personagem, botões de jogar, reiniciar mapa e sair.
+- Tela de conclusão ao chegar no topo da torre.
+- HUD atualizado com vida, carga do salto, progresso de altura e zona atual.
+- Cena `Assets/Main.unity` registrada no Build Settings.
+
+Observação: a transição entre cenas foi ignorada conforme solicitado, mantendo o jogo em uma única cena.
