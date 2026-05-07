@@ -170,7 +170,7 @@ MonoBehaviour:
   accelerationMultiplier: 0.9
   maxSpeedMultiplier: 0.9
   gravityMultiplier: 1
-  breakDelay: 0.28
+  breakDelay: 3
   respawnDelay: 2.5
 --- !u!61 &6883454
 BoxCollider2D:
@@ -5586,7 +5586,7 @@ MonoBehaviour:
   accelerationMultiplier: 0.9
   maxSpeedMultiplier: 0.9
   gravityMultiplier: 1
-  breakDelay: 0.28
+  breakDelay: 3
   respawnDelay: 2.5
 --- !u!61 &905437629
 BoxCollider2D:
@@ -7566,7 +7566,7 @@ MonoBehaviour:
   accelerationMultiplier: 0.9
   maxSpeedMultiplier: 0.9
   gravityMultiplier: 1
-  breakDelay: 0.28
+  breakDelay: 3
   respawnDelay: 2.5
 --- !u!61 &1160896237
 BoxCollider2D:
@@ -11066,7 +11066,7 @@ MonoBehaviour:
   accelerationMultiplier: 0.9
   maxSpeedMultiplier: 0.9
   gravityMultiplier: 1
-  breakDelay: 0.28
+  breakDelay: 3
   respawnDelay: 2.5
 --- !u!61 &1827834942
 BoxCollider2D:

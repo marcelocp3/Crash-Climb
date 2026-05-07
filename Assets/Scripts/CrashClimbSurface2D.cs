@@ -82,7 +82,7 @@ namespace CrashClimb
                     accelerationMultiplier = 0.9f;
                     maxSpeedMultiplier = 0.9f;
                     gravityMultiplier = 1f;
-                    breakDelay = 0.28f;
+                    breakDelay = 3f;
                     break;
             }
         }
