@@ -44,6 +44,7 @@ Itens implementados:
 - Menu inicial com arte do background/personagem, botões de jogar, reiniciar mapa e sair.
 - Tela de conclusão ao chegar no topo da torre.
 - HUD atualizado com vida, carga do salto, progresso de altura e zona atual.
+- Áudio de menu, gameplay, pulo, pouso em gelo/gosma, dano e quebra de plataforma carregado por `Resources/CrashClimb/Audio`.
 - Cenas `Assets/MainMenu.unity`, `Assets/Main.unity` e `Assets/GameComplete.unity` registradas no Build Settings, com transição menu -> jogo -> conclusão.
 
 Fluxo de cenas: `MainMenu` abre o menu final, `Main` executa o mapa jogável e `GameComplete` mostra a tela de conclusão.

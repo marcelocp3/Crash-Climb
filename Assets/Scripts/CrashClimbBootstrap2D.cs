@@ -33,6 +33,7 @@ namespace CrashClimb
 
         public static void EnsureRuntimeObjects()
         {
+            CrashClimbAudio2D.EnsureExists();
             EnsureMainMenuExists();
 
             if (!IsGameplayScene(SceneManager.GetActiveScene().name))

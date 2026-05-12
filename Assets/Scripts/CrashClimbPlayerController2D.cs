@@ -66,6 +66,7 @@ namespace CrashClimb
         private bool isChargingJump;
         private bool isDead;
         private bool isInvulnerable;
+        private bool hasUpdatedGroundedState;
         private float baseGravityScale;
         private float surfaceGravityMultiplier = 1f;
         private float surfaceGravityTimer;
@@ -126,6 +127,7 @@ namespace CrashClimb
 
         private void UpdateGroundedState()
         {
+            bool wasGrounded = isGrounded;
             float direction = Mathf.Sign(rb.gravityScale);
             Vector2 checkDirection = direction >= 0f ? Vector2.down : Vector2.up;
             Bounds bounds = bodyCollider.bounds;
@@ -151,7 +153,13 @@ namespace CrashClimb
             {
                 lastGroundedTime = Time.time;
                 currentSurface = groundCollider.GetComponentInParent<CrashClimbSurface2D>();
+                if (!wasGrounded && hasUpdatedGroundedState && currentSurface != null)
+                {
+                    CrashClimbAudio2D.PlayLanding(currentSurface.Kind);
+                }
             }
+
+            hasUpdatedGroundedState = true;
         }
 
         private void HandleJumpInput()
@@ -215,6 +223,10 @@ namespace CrashClimb
             float gravityDirection = Mathf.Sign(rb.gravityScale);
             Vector2 jumpDirection = gravityDirection >= 0f ? Vector2.up : Vector2.down;
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpDirection.y * finalJumpForce);
+            if (currentSurface != null)
+            {
+                CrashClimbAudio2D.PlayJump(currentSurface.Kind);
+            }
 
             if (currentSurface != null && currentSurface.Kind == CrashClimbSurfaceKind.Crystal)
             {
@@ -319,6 +331,7 @@ namespace CrashClimb
             }
 
             currentHealth -= amount;
+            CrashClimbAudio2D.PlayDamage();
             rb.linearVelocity = knockback;
             animator?.SetTrigger("Hurt");
             spriteAnimator?.PlayHurt();

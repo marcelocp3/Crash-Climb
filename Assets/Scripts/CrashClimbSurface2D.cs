@@ -105,6 +105,8 @@ namespace CrashClimb
             breaking = true;
             yield return new WaitForSeconds(breakDelay);
 
+            CrashClimbAudio2D.PlayPlatformBreak();
+
             if (surfaceCollider != null)
             {
                 surfaceCollider.enabled = false;
