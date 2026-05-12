@@ -44,6 +44,7 @@ Itens implementados:
 - Menu inicial com arte do background/personagem, botões de jogar, reiniciar mapa e sair.
 - Tela de conclusão ao chegar no topo da torre.
 - HUD atualizado com vida, carga do salto, progresso de altura e zona atual.
-- Cena `Assets/Main.unity` registrada no Build Settings.
+- Cenas `Assets/MainMenu.unity`, `Assets/Main.unity` e `Assets/GameComplete.unity` registradas no Build Settings, com transição menu -> jogo -> conclusão.
 
-Observação: a transição entre cenas foi ignorada conforme solicitado, mantendo o jogo em uma única cena.
+Fluxo de cenas: `MainMenu` abre o menu final, `Main` executa o mapa jogável e `GameComplete` mostra a tela de conclusão.
+Imagem final do menu: salvar o PNG em `Assets/Resources/CrashClimb/Menu/MenuBackground.png`. O menu carrega esse arquivo automaticamente quando existir.

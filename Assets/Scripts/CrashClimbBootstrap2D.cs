@@ -1,20 +1,56 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace CrashClimb
 {
     public static class CrashClimbBootstrap2D
     {
+        private const string GameplaySceneName = "Main";
+        private static bool sceneEventsRegistered;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterSceneEvents()
+        {
+            if (sceneEventsRegistered)
+            {
+                return;
+            }
+
+            SceneManager.sceneLoaded += HandleSceneLoaded;
+            sceneEventsRegistered = true;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureGameExists()
         {
             EnsureRuntimeObjects();
         }
 
+        private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            EnsureRuntimeObjects();
+        }
+
         public static void EnsureRuntimeObjects()
         {
-            EnsureHealthHudExists();
             EnsureMainMenuExists();
 
+            if (!IsGameplayScene(SceneManager.GetActiveScene().name))
+            {
+                return;
+            }
+
+            EnsureHealthHudExists();
+            EnsureMapExists();
+        }
+
+        private static bool IsGameplayScene(string sceneName)
+        {
+            return sceneName == GameplaySceneName;
+        }
+
+        private static void EnsureMapExists()
+        {
             if (Object.FindFirstObjectByType<CrashClimbProceduralMap2D>() != null)
             {
                 return;

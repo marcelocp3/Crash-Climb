@@ -1,4 +1,8 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace CrashClimb
 {
@@ -15,6 +19,10 @@ namespace CrashClimb
 
         private static CrashClimbMainMenu2D instance;
         private static Texture2D whiteTexture;
+        private const string MainMenuSceneName = "MainMenu";
+        private const string GameplaySceneName = "Main";
+        private const string GameCompleteSceneName = "GameComplete";
+        private static bool gameplayRequested;
 
         [SerializeField] private MenuState state = MenuState.Main;
         [SerializeField] private bool pauseOnStart = true;
@@ -23,6 +31,7 @@ namespace CrashClimb
         private GUIStyle subtitleStyle;
         private GUIStyle buttonStyle;
         private GUIStyle smallStyle;
+        private Texture2D menuBackgroundTexture;
         private Texture2D skyTexture;
         private Texture2D backgroundTexture;
         private Texture2D heroTexture;
@@ -43,21 +52,19 @@ namespace CrashClimb
             DontDestroyOnLoad(gameObject);
             LoadTextures();
             EnsureWhiteTexture();
-
-            if (pauseOnStart)
-            {
-                Time.timeScale = 0f;
-            }
+            ApplySceneState(SceneManager.GetActiveScene().name);
         }
 
         private void OnEnable()
         {
             CrashClimbGoal2D.GoalReached += ShowVictory;
+            SceneManager.sceneLoaded += HandleSceneLoaded;
         }
 
         private void OnDisable()
         {
             CrashClimbGoal2D.GoalReached -= ShowVictory;
+            SceneManager.sceneLoaded -= HandleSceneLoaded;
         }
 
         private void OnGUI()
@@ -74,7 +81,8 @@ namespace CrashClimb
             DrawJumpScene();
 
             Rect screenPanel = new Rect(0f, 0f, Screen.width, Screen.height);
-            DrawRect(screenPanel, new Color(0.025f, 0.03f, 0.035f, 0.42f));
+            float overlayAlpha = menuBackgroundTexture != null ? 0.08f : 0.42f;
+            DrawRect(screenPanel, new Color(0.025f, 0.03f, 0.035f, overlayAlpha));
             DrawRect(new Rect(0f, 0f, Screen.width, 4f), new Color(0.75f, 0.32f, 1f, 0.95f));
 
             Rect panel = new Rect(0f, 0f, Screen.width, Screen.height);
@@ -107,35 +115,35 @@ namespace CrashClimb
 
         private void DrawMain(Rect panel)
         {
+            bool hasFinalBackground = menuBackgroundTexture != null;
             float titleY = Mathf.Max(36f, Screen.height * 0.12f);
-            GUI.Label(new Rect(0f, titleY, Screen.width, 82f), "Crash&Climb", titleStyle);
+            if (!hasFinalBackground)
+            {
+                GUI.Label(new Rect(0f, titleY, Screen.width, 82f), "Crash&Climb", titleStyle);
+            }
 
             float buttonWidth = Mathf.Min(360f, Screen.width - 56f);
             float buttonHeight = Mathf.Clamp(Screen.height * 0.13f, 58f, 76f);
             float buttonX = (Screen.width - buttonWidth) * 0.5f;
             float gap = Mathf.Clamp(Screen.height * 0.025f, 10f, 18f);
-            float totalButtonHeight = buttonHeight * 4f + gap * 3f;
-            float buttonY = Mathf.Min(titleY + 104f, Screen.height - totalButtonHeight - 24f);
-            buttonY = Mathf.Max(titleY + 82f, buttonY);
+            float totalButtonHeight = buttonHeight * 3f + gap * 2f;
+            float targetButtonY = hasFinalBackground ? Screen.height * 0.58f : titleY + 104f;
+            float buttonY = Mathf.Min(targetButtonY, Screen.height - totalButtonHeight - 24f);
+            buttonY = Mathf.Max(hasFinalBackground ? 24f : titleY + 82f, buttonY);
 
             if (DrawPlatformButton(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), "JOGAR"))
             {
                 StartGame(false);
             }
 
-            if (DrawPlatformButton(new Rect(buttonX, buttonY + (buttonHeight + gap), buttonWidth, buttonHeight), "OPÇÕES"))
-            {
-                state = MenuState.Options;
-            }
-
-            if (DrawPlatformButton(new Rect(buttonX, buttonY + (buttonHeight + gap) * 2f, buttonWidth, buttonHeight), "CRÉDITOS"))
+            if (DrawPlatformButton(new Rect(buttonX, buttonY + (buttonHeight + gap), buttonWidth, buttonHeight), "CRÉDITOS"))
             {
                 state = MenuState.Credits;
             }
 
-            if (DrawPlatformButton(new Rect(buttonX, buttonY + (buttonHeight + gap) * 3f, buttonWidth, buttonHeight), "SAIR"))
+            if (DrawPlatformButton(new Rect(buttonX, buttonY + (buttonHeight + gap) * 2f, buttonWidth, buttonHeight), "SAIR"))
             {
-                Application.Quit();
+                QuitGame();
             }
         }
 
@@ -181,8 +189,7 @@ namespace CrashClimb
 
             if (DrawPlatformButton(new Rect(buttonX, buttonY + 94f, buttonWidth, 72f), "VOLTAR AO MENU"))
             {
-                state = MenuState.Main;
-                Time.timeScale = 0f;
+                LoadMainMenu();
             }
         }
 
@@ -195,7 +202,7 @@ namespace CrashClimb
 
         private void DrawBackdrop()
         {
-            Texture2D backdrop = skyTexture != null ? skyTexture : backgroundTexture;
+            Texture2D backdrop = menuBackgroundTexture != null ? menuBackgroundTexture : skyTexture != null ? skyTexture : backgroundTexture;
             if (backdrop != null)
             {
                 GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), backdrop, ScaleMode.ScaleAndCrop);
@@ -205,7 +212,8 @@ namespace CrashClimb
                 DrawRect(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0.05f, 0.07f, 0.09f, 1f));
             }
 
-            DrawRect(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.18f));
+            float vignetteAlpha = menuBackgroundTexture != null ? 0.04f : 0.18f;
+            DrawRect(new Rect(0f, 0f, Screen.width, Screen.height), new Color(0f, 0f, 0f, vignetteAlpha));
         }
 
         private bool DrawPlatformButton(Rect rect, string label)
@@ -252,7 +260,7 @@ namespace CrashClimb
 
         private void DrawJumpScene()
         {
-            if (heroTexture == null || Screen.width < 520)
+            if (menuBackgroundTexture != null || heroTexture == null || Screen.width < 520)
             {
                 return;
             }
@@ -297,6 +305,16 @@ namespace CrashClimb
 
         private void StartGame(bool rebuildMap)
         {
+            gameplayRequested = true;
+
+            if (SceneManager.GetActiveScene().name != GameplaySceneName)
+            {
+                state = MenuState.Playing;
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(GameplaySceneName);
+                return;
+            }
+
             if (rebuildMap)
             {
                 CrashClimbProceduralMap2D map = Object.FindFirstObjectByType<CrashClimbProceduralMap2D>();
@@ -317,17 +335,73 @@ namespace CrashClimb
 
         private void ShowVictory(CrashClimbPlayerController2D player)
         {
+            gameplayRequested = false;
             state = MenuState.Victory;
             Time.timeScale = 0f;
+
+            if (SceneManager.GetActiveScene().name != GameCompleteSceneName)
+            {
+                SceneManager.LoadScene(GameCompleteSceneName);
+            }
+        }
+
+        private void LoadMainMenu()
+        {
+            gameplayRequested = false;
+            state = MenuState.Main;
+            Time.timeScale = 0f;
+
+            if (SceneManager.GetActiveScene().name != MainMenuSceneName)
+            {
+                SceneManager.LoadScene(MainMenuSceneName);
+            }
+        }
+
+        private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            ApplySceneState(scene.name);
+        }
+
+        private void ApplySceneState(string sceneName)
+        {
+            if (sceneName == GameplaySceneName)
+            {
+                state = gameplayRequested ? MenuState.Playing : MenuState.Main;
+                Time.timeScale = gameplayRequested ? 1f : 0f;
+                return;
+            }
+
+            if (sceneName == GameCompleteSceneName)
+            {
+                state = MenuState.Victory;
+                Time.timeScale = 0f;
+                return;
+            }
+
+            state = MenuState.Main;
+            if (pauseOnStart)
+            {
+                Time.timeScale = 0f;
+            }
         }
 
         private void LoadTextures()
         {
+            menuBackgroundTexture = Resources.Load<Texture2D>("CrashClimb/Menu/MenuBackground");
             skyTexture = Resources.Load<Texture2D>("CrashClimb/Background/Game_Background_1/Sky");
             backgroundTexture = Resources.Load<Texture2D>("CrashClimb/Background/Game_Background_1/BackGround");
             heroTexture = Resources.Load<Texture2D>("CrashClimb/Wraith_01/PNG Sequences/Idle/Wraith_01_Idle_000");
             platformTexture = Resources.Load<Texture2D>("CrashClimb/Pads/Pad_1_1");
             platformSprite = Resources.Load<Sprite>("CrashClimb/Pads/Pad_1_1");
+        }
+
+        private void QuitGame()
+        {
+#if UNITY_EDITOR
+            EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         private void EnsureWhiteTexture()
