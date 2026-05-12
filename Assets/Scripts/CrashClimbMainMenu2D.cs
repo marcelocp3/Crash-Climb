@@ -27,7 +27,6 @@ namespace CrashClimb
         private Texture2D backgroundTexture;
         private Texture2D heroTexture;
         private Texture2D platformTexture;
-        private Texture2D menuButtonTexture;
         private Sprite platformSprite;
 
         public static bool IsBlockingHud => instance != null && instance.state != MenuState.Playing;
@@ -111,11 +110,13 @@ namespace CrashClimb
             float titleY = Mathf.Max(36f, Screen.height * 0.12f);
             GUI.Label(new Rect(0f, titleY, Screen.width, 82f), "Crash&Climb", titleStyle);
 
-            float buttonWidth = Mathf.Min(340f, Screen.width - 56f);
-            float buttonHeight = 72f;
+            float buttonWidth = Mathf.Min(360f, Screen.width - 56f);
+            float buttonHeight = Mathf.Clamp(Screen.height * 0.13f, 58f, 76f);
             float buttonX = (Screen.width - buttonWidth) * 0.5f;
-            float buttonY = titleY + 116f;
-            float gap = 22f;
+            float gap = Mathf.Clamp(Screen.height * 0.025f, 10f, 18f);
+            float totalButtonHeight = buttonHeight * 4f + gap * 3f;
+            float buttonY = Mathf.Min(titleY + 104f, Screen.height - totalButtonHeight - 24f);
+            buttonY = Mathf.Max(titleY + 82f, buttonY);
 
             if (DrawPlatformButton(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), "JOGAR"))
             {
@@ -209,20 +210,44 @@ namespace CrashClimb
 
         private bool DrawPlatformButton(Rect rect, string label)
         {
-            EnsureMenuButtonTexture();
+            Rect shadowRect = new Rect(rect.x + 6f, rect.y + 8f, rect.width, rect.height);
+            DrawPlatformButtonTexture(shadowRect, new Color(0f, 0f, 0f, 0.26f));
 
-            GUI.DrawTexture(rect, menuButtonTexture, ScaleMode.StretchToFill, true);
+            bool isHovering = rect.Contains(Event.current.mousePosition);
+            DrawPlatformButtonTexture(rect, isHovering ? new Color(1f, 1f, 0.94f, 1f) : Color.white);
+
             Color previousTextColor = buttonStyle.normal.textColor;
             buttonStyle.normal.textColor = new Color(0.06f, 0.06f, 0.055f, 0.9f);
-            GUI.Label(new Rect(rect.x + 8f, rect.y + 14f, rect.width - 12f, rect.height - 18f), label, buttonStyle);
+            GUI.Label(new Rect(rect.x + 8f, rect.y + rect.height * 0.14f + 3f, rect.width - 12f, rect.height * 0.52f), label, buttonStyle);
             buttonStyle.normal.textColor = previousTextColor;
-            GUI.Label(new Rect(rect.x + 6f, rect.y + 11f, rect.width - 12f, rect.height - 18f), label, buttonStyle);
+            GUI.Label(new Rect(rect.x + 6f, rect.y + rect.height * 0.14f, rect.width - 12f, rect.height * 0.52f), label, buttonStyle);
 
             Color previousColor = GUI.color;
             GUI.color = Color.clear;
             bool clicked = GUI.Button(rect, GUIContent.none);
             GUI.color = previousColor;
             return clicked;
+        }
+
+        private void DrawPlatformButtonTexture(Rect rect, Color tint)
+        {
+            Color previousColor = GUI.color;
+            GUI.color = tint;
+
+            if (platformTexture != null)
+            {
+                GUI.DrawTexture(rect, platformTexture, ScaleMode.StretchToFill, true);
+            }
+            else if (platformSprite != null && platformSprite.texture != null)
+            {
+                GUI.DrawTexture(rect, platformSprite.texture, ScaleMode.StretchToFill, true);
+            }
+            else
+            {
+                DrawPlatform(rect);
+            }
+
+            GUI.color = previousColor;
         }
 
         private void DrawJumpScene()
@@ -353,54 +378,6 @@ namespace CrashClimb
                 hover = { textColor = Color.white },
                 active = { textColor = Color.white }
             };
-        }
-
-        private void EnsureMenuButtonTexture()
-        {
-            if (menuButtonTexture != null)
-            {
-                return;
-            }
-
-            const int width = 512;
-            const int height = 128;
-            menuButtonTexture = new Texture2D(width, height);
-            menuButtonTexture.filterMode = FilterMode.Bilinear;
-
-            Color clear = new Color(0f, 0f, 0f, 0f);
-            Color grass = new Color(0.28f, 0.78f, 0.32f, 0.96f);
-            Color grassLight = new Color(0.52f, 0.95f, 0.45f, 0.96f);
-            Color dirt = new Color(0.28f, 0.13f, 0.09f, 0.96f);
-            Color shadow = new Color(0.08f, 0.04f, 0.035f, 0.7f);
-
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    float nx = x / (float)(width - 1);
-                    float ny = y / (float)(height - 1);
-                    float edge = Mathf.Abs(nx - 0.5f) * 2f;
-                    float topCurve = 0.2f + edge * edge * 0.28f + Mathf.Sin(nx * Mathf.PI * 8f) * 0.015f;
-                    float bottomCurve = 0.88f - edge * edge * 0.18f + Mathf.Sin(nx * Mathf.PI * 6f) * 0.012f;
-
-                    if (ny < topCurve || ny > bottomCurve)
-                    {
-                        menuButtonTexture.SetPixel(x, y, clear);
-                        continue;
-                    }
-
-                    if (ny > 0.68f)
-                    {
-                        menuButtonTexture.SetPixel(x, y, Color.Lerp(dirt, shadow, Mathf.InverseLerp(0.68f, bottomCurve, ny)));
-                        continue;
-                    }
-
-                    float highlight = Mathf.Sin(nx * Mathf.PI) * 0.22f + Mathf.Sin((nx + ny) * Mathf.PI * 14f) * 0.035f;
-                    menuButtonTexture.SetPixel(x, y, Color.Lerp(grass, grassLight, Mathf.Clamp01(0.28f + highlight)));
-                }
-            }
-
-            menuButtonTexture.Apply();
         }
 
         private void DrawRect(Rect rect, Color color)
