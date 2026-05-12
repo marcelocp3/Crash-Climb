@@ -29,15 +29,6 @@ namespace CrashClimb
         private static readonly Color GlueColor = new Color(0.48f, 0.82f, 0.28f);
         private static readonly Color CrystalColor = new Color(0.75f, 0.32f, 1f);
         private static readonly Color FragileColor = new Color(0.72f, 0.46f, 0.28f);
-        private static readonly LevelZone[] LevelZones =
-        {
-            new LevelZone(1, 7, "Entrada de Pedra", CrashClimbSurfaceKind.Stone, CrashClimbSurfaceKind.Ice, 2.45f, 0),
-            new LevelZone(8, 15, "Cornijas de Gelo", CrashClimbSurfaceKind.Ice, CrashClimbSurfaceKind.Stone, 3.05f, 4),
-            new LevelZone(16, 23, "Passagem de Cola", CrashClimbSurfaceKind.Glue, CrashClimbSurfaceKind.FragileRock, 3.35f, 5),
-            new LevelZone(24, 31, "Rochas Quebraveis", CrashClimbSurfaceKind.FragileRock, CrashClimbSurfaceKind.Stone, 3.55f, 4),
-            new LevelZone(32, 38, "Subida de Cristal", CrashClimbSurfaceKind.Crystal, CrashClimbSurfaceKind.Ice, 3.2f, 3),
-            new LevelZone(39, 42, "Topo Final", CrashClimbSurfaceKind.Stone, CrashClimbSurfaceKind.Crystal, 2.65f, 2)
-        };
         private readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
         private const int CurrentLevelDesignVersion = 5;
 
