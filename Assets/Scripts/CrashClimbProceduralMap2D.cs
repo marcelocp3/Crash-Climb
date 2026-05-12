@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace CrashClimb
 {
+    [ExecuteAlways]
     public class CrashClimbProceduralMap2D : MonoBehaviour
     {
         [Header("Map")]
@@ -75,27 +76,37 @@ namespace CrashClimb
             towerHalfWidth = Mathf.Clamp(towerHalfWidth, 3.8f, 5.4f);
             platformSize.x = Mathf.Clamp(platformSize.x, 2.15f, 3.6f);
             platformSize.y = Mathf.Clamp(platformSize.y, 0.25f, 0.6f);
+
+#if UNITY_EDITOR
+            // Rebuild in editor when values change, so the edit view matches the play view.
+            if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                UnityEditor.EditorApplication.delayCall += () =>
+                {
+                    if (this != null && !Application.isPlaying)
+                    {
+                        Build();
+                    }
+                };
+            }
+#endif
         }
 
         private void Start()
         {
-            CrashClimbBootstrap2D.EnsureRuntimeObjects();
-
-            if (!buildOnStart)
+            if (Application.isPlaying)
             {
-                return;
-            }
+                CrashClimbBootstrap2D.EnsureRuntimeObjects();
 
-            if (levelDesignVersion != CurrentLevelDesignVersion)
-            {
-                ApplyDefaultFields();
-                Build();
-                return;
-            }
-
-            if (transform.childCount == 0)
-            {
-                Build();
+                if (buildOnStart)
+                {
+                    // If the map hasn't been built or we are on an old version, build it.
+                    // This ensures the game always starts with a fresh, correct map.
+                    if (transform.childCount == 0 || levelDesignVersion != CurrentLevelDesignVersion)
+                    {
+                        Build();
+                    }
+                }
             }
         }
 
