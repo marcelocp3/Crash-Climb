@@ -3,7 +3,6 @@ using UnityEngine;
 
 namespace CrashClimb
 {
-    [ExecuteAlways]
     public class CrashClimbProceduralMap2D : MonoBehaviour
     {
         [Header("Map")]
@@ -11,6 +10,7 @@ namespace CrashClimb
         [SerializeField] private float verticalSpacing = 1.58f;
         [SerializeField] private float towerHalfWidth = 4.6f;
         [SerializeField] private Vector2 platformSize = new Vector2(2.65f, 0.34f);
+        [Tooltip("Builds only when this map has no children, so manual scene edits are preserved.")]
         [SerializeField] private bool buildOnStart = true;
         [SerializeField] private int levelDesignVersion;
 
@@ -29,6 +29,15 @@ namespace CrashClimb
         private static readonly Color GlueColor = new Color(0.48f, 0.82f, 0.28f);
         private static readonly Color CrystalColor = new Color(0.75f, 0.32f, 1f);
         private static readonly Color FragileColor = new Color(0.72f, 0.46f, 0.28f);
+        private static readonly LevelZone[] LevelZones =
+        {
+            new LevelZone(1, 7, "Entrada de Pedra", CrashClimbSurfaceKind.Stone, CrashClimbSurfaceKind.Ice, 2.45f, 0),
+            new LevelZone(8, 15, "Cornijas de Gelo", CrashClimbSurfaceKind.Ice, CrashClimbSurfaceKind.Stone, 3.05f, 4),
+            new LevelZone(16, 23, "Passagem de Cola", CrashClimbSurfaceKind.Glue, CrashClimbSurfaceKind.FragileRock, 3.35f, 5),
+            new LevelZone(24, 31, "Rochas Quebraveis", CrashClimbSurfaceKind.FragileRock, CrashClimbSurfaceKind.Stone, 3.55f, 4),
+            new LevelZone(32, 38, "Subida de Cristal", CrashClimbSurfaceKind.Crystal, CrashClimbSurfaceKind.Ice, 3.2f, 3),
+            new LevelZone(39, 42, "Topo Final", CrashClimbSurfaceKind.Stone, CrashClimbSurfaceKind.Crystal, 2.65f, 2)
+        };
         private readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
         private const int CurrentLevelDesignVersion = 5;
 
@@ -68,19 +77,6 @@ namespace CrashClimb
             platformSize.x = Mathf.Clamp(platformSize.x, 2.15f, 3.6f);
             platformSize.y = Mathf.Clamp(platformSize.y, 0.25f, 0.6f);
 
-#if UNITY_EDITOR
-            // Rebuild in editor when values change, so the edit view matches the play view.
-            if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode)
-            {
-                UnityEditor.EditorApplication.delayCall += () =>
-                {
-                    if (this != null && !Application.isPlaying)
-                    {
-                        Build();
-                    }
-                };
-            }
-#endif
         }
 
         private void Start()
@@ -89,14 +85,9 @@ namespace CrashClimb
             {
                 CrashClimbBootstrap2D.EnsureRuntimeObjects();
 
-                if (buildOnStart)
+                if (buildOnStart && transform.childCount == 0)
                 {
-                    // If the map hasn't been built or we are on an old version, build it.
-                    // This ensures the game always starts with a fresh, correct map.
-                    if (transform.childCount == 0 || levelDesignVersion != CurrentLevelDesignVersion)
-                    {
-                        Build();
-                    }
+                    Build();
                 }
             }
         }
@@ -110,7 +101,6 @@ namespace CrashClimb
             CreateBackground();
             CreateTowerWalls();
             CreatePlatform("Spawn Platform", new Vector2(0f, 0f), new Vector2(7f, 0.5f), CrashClimbSurfaceKind.Stone);
-            CreateZoneMarker("Area 1 - Entrada de Pedra", new Vector2(-towerHalfWidth + 0.55f, 1.15f), StoneColor);
 
             for (int i = 1; i <= platformCount; i++)
             {
@@ -127,11 +117,6 @@ namespace CrashClimb
                 Vector2 size = new Vector2(width, platformSize.y);
                 CrashClimbSurfaceKind kind = PickSurfaceKind(i, zone);
                 CreatePlatform($"Platform {i:00} - {kind}", new Vector2(sideBias, y), size, kind);
-
-                if (i == zone.Start && i > 1)
-                {
-                    CreateZoneMarker($"Area {GetZoneNumber(i)} - {zone.Name}", new Vector2(-towerHalfWidth + 0.55f, y + 0.72f), GetSurfaceColor(zone.Primary));
-                }
 
                 if (ShouldPlaceSpike(i, zone))
                 {
@@ -429,21 +414,6 @@ namespace CrashClimb
             collider.isTrigger = true;
 
             goalTrigger.AddComponent<CrashClimbGoal2D>();
-        }
-
-        private void CreateZoneMarker(string text, Vector2 position, Color color)
-        {
-            GameObject marker = new GameObject(text);
-            marker.transform.SetParent(transform);
-            marker.transform.position = new Vector3(position.x, position.y, -0.25f);
-
-            TextMesh label = marker.AddComponent<TextMesh>();
-            label.text = text;
-            label.anchor = TextAnchor.MiddleLeft;
-            label.alignment = TextAlignment.Left;
-            label.characterSize = 0.18f;
-            label.fontSize = 32;
-            label.color = new Color(color.r, color.g, color.b, 0.82f);
         }
 
         private bool ShouldPlaceSpike(int index, LevelZone zone)
