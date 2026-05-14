@@ -44,7 +44,7 @@ namespace CrashClimb
 
         [Header("Health")]
         [SerializeField] private int maxHealth = 3;
-        [SerializeField] private float invulnerabilityTime = 0.8f;
+        [SerializeField] private float invulnerabilityTime = 0.4f;
         [SerializeField] private Transform respawnPoint;
         [SerializeField] private float fallDeathY = -18f;
 
@@ -91,6 +91,9 @@ namespace CrashClimb
             baseGravityScale = Mathf.Approximately(rb.gravityScale, 0f) ? 3f : rb.gravityScale;
             rb.gravityScale = baseGravityScale;
             spawnPosition = respawnPoint != null ? respawnPoint.position : transform.position;
+
+            // Force override — serialized scene values do not update from code defaults
+            invulnerabilityTime = 0.08f;
         }
 
         private void Update()
@@ -109,7 +112,7 @@ namespace CrashClimb
 
             if (transform.position.y <= fallDeathY)
             {
-                Respawn();
+                Die();
             }
         }
 
@@ -338,11 +341,22 @@ namespace CrashClimb
 
             if (currentHealth <= 0)
             {
-                Respawn();
+                Die();
                 return;
             }
 
             StartCoroutine(InvulnerabilityRoutine());
+        }
+
+        private void Die()
+        {
+            if (isDead) return;
+            isDead = true;
+            rb.linearVelocity = Vector2.zero;
+            rb.simulated = false;
+            animator?.SetBool("Dead", true);
+            spriteAnimator?.PlayHurt();
+            CrashClimbMainMenu2D.ShowGameOver();
         }
 
         private IEnumerator InvulnerabilityRoutine()
@@ -371,6 +385,8 @@ namespace CrashClimb
 
         private void Respawn()
         {
+            isDead = false;
+            rb.simulated = true;
             currentHealth = maxHealth;
             isChargingJump = false;
             jumpChargeTime = 0f;
@@ -382,7 +398,13 @@ namespace CrashClimb
             rb.gravityScale = baseGravityScale;
             transform.position = respawnPoint != null ? respawnPoint.position : spawnPosition;
             animator?.SetTrigger("Respawn");
+            animator?.SetBool("Dead", false);
             spriteAnimator?.PlayIdle();
+        }
+
+        public void SetSpawnPosition(Vector3 position)
+        {
+            spawnPosition = position;
         }
 
         public void ResetToSpawn()

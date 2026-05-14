@@ -14,7 +14,8 @@ namespace CrashClimb
             Options,
             Credits,
             Playing,
-            Victory
+            Victory,
+            GameOver
         }
 
         private static CrashClimbMainMenu2D instance;
@@ -24,6 +25,7 @@ namespace CrashClimb
         private const string GameCompleteSceneName = "GameComplete";
         private static readonly Rect MenuButtonTextureCrop = new Rect(0.06f, 0.27f, 0.88f, 0.48f);
         private static bool gameplayRequested;
+        private bool wasPlaying;
 
         [SerializeField] private MenuState state = MenuState.Main;
         [SerializeField] private bool pauseOnStart = true;
@@ -40,6 +42,12 @@ namespace CrashClimb
         private Texture2D playButtonTexture;
         private Texture2D creditsButtonTexture;
         private Texture2D exitButtonTexture;
+        private Texture2D deathBackgroundTexture;
+        private Texture2D retryButtonTexture;
+        private Texture2D homeButtonTexture;
+        private Texture2D victoryBackgroundTexture;
+        private Texture2D victoryRetryButtonTexture;
+        private Texture2D victoryHomeButtonTexture;
         private Sprite platformSprite;
 
         public static bool IsBlockingHud => instance != null && instance.state != MenuState.Playing;
@@ -102,6 +110,10 @@ namespace CrashClimb
             {
                 DrawCredits(panel);
             }
+            else if (state == MenuState.GameOver)
+            {
+                DrawGameOver(panel);
+            }
             else
             {
                 DrawMain(panel);
@@ -113,6 +125,7 @@ namespace CrashClimb
             if (state == MenuState.Playing && Input.GetKeyDown(KeyCode.Escape))
             {
                 state = MenuState.Main;
+                wasPlaying = true;
                 Time.timeScale = 0f;
             }
         }
@@ -144,7 +157,19 @@ namespace CrashClimb
 
             if (DrawMenuImageButton(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), playButtonTexture, "JOGAR"))
             {
-                StartGame(false);
+                if (wasPlaying)
+                {
+                    // Resume from ESC pause — don't touch the player
+                    wasPlaying = false;
+                    gameplayRequested = true;
+                    state = MenuState.Playing;
+                    Time.timeScale = 1f;
+                    CrashClimbAudio2D.PlayGameplayMusic();
+                }
+                else
+                {
+                    StartGame();
+                }
             }
 
             if (DrawMenuImageButton(new Rect(buttonX, buttonY + (buttonHeight + gap), buttonWidth, buttonHeight), creditsButtonTexture, "CRÉDITOS"))
@@ -184,23 +209,80 @@ namespace CrashClimb
             }
         }
 
-        private void DrawVictory(Rect panel)
+        private void DrawGameOver(Rect panel)
         {
-            float titleY = Mathf.Max(46f, Screen.height * 0.14f);
-            GUI.Label(new Rect(0f, titleY, Screen.width, 74f), "TOPO ALCANÇADO", titleStyle);
-            GUI.Label(new Rect(Screen.width * 0.5f - 245f, titleY + 88f, 490f, 62f), "A torre completa foi vencida. O level design termina na plataforma de cristal final.", subtitleStyle);
-
-            float buttonWidth = Mathf.Min(340f, Screen.width - 56f);
-            float buttonX = (Screen.width - buttonWidth) * 0.5f;
-            float buttonY = titleY + 178f;
-            if (DrawPlatformButton(new Rect(buttonX, buttonY, buttonWidth, 72f), "JOGAR NOVAMENTE"))
+            bool hasMenuButtonSprites = retryButtonTexture != null && homeButtonTexture != null;
+            
+            // Even larger buttons to fill the screen better
+            float buttonWidth = hasMenuButtonSprites ? Mathf.Clamp(Screen.width * 0.68f, 440f, 700f) : Mathf.Min(360f, Screen.width - 56f);
+            if (hasMenuButtonSprites)
             {
-                StartGame(true);
+                buttonWidth = Mathf.Min(buttonWidth, Screen.width - 48f);
             }
 
-            if (DrawPlatformButton(new Rect(buttonX, buttonY + 94f, buttonWidth, 72f), "VOLTAR AO MENU"))
+            float buttonHeight = hasMenuButtonSprites ? Mathf.Clamp(buttonWidth * 0.48f, 160f, 260f) : Mathf.Clamp(Screen.height * 0.13f, 58f, 76f);
+            float buttonX = (Screen.width - buttonWidth) * 0.5f;
+            
+            // Even more negative gap to overcome large sprite padding
+            float gap = hasMenuButtonSprites ? -buttonHeight * 0.45f : 8f; 
+            
+            float totalButtonHeight = buttonHeight * 2f + gap;
+            float targetButtonY = Screen.height * 0.22f;
+            float minButtonY = Screen.height * 0.08f;
+            float maxButtonY = Mathf.Max(minButtonY, Screen.height - totalButtonHeight - 12f);
+            float buttonY = Mathf.Clamp(targetButtonY, minButtonY, maxButtonY);
+
+            if (DrawSimpleImageButton(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), retryButtonTexture, "TENTAR NOVAMENTE"))
+            {
+                ResumeOrRestartGame();
+            }
+
+            if (DrawSimpleImageButton(new Rect(buttonX, buttonY + buttonHeight + gap, buttonWidth, buttonHeight), homeButtonTexture, "MENU INICIAL"))
             {
                 LoadMainMenu();
+            }
+        }
+
+        private void DrawVictory(Rect panel)
+        {
+            bool hasMenuButtonSprites = victoryRetryButtonTexture != null && victoryHomeButtonTexture != null;
+            
+            float buttonWidth = hasMenuButtonSprites ? Mathf.Clamp(Screen.width * 0.68f, 440f, 700f) : Mathf.Min(360f, Screen.width - 56f);
+            if (hasMenuButtonSprites)
+            {
+                buttonWidth = Mathf.Min(buttonWidth, Screen.width - 48f);
+            }
+
+            float buttonHeight = hasMenuButtonSprites ? Mathf.Clamp(buttonWidth * 0.48f, 160f, 260f) : Mathf.Clamp(Screen.height * 0.13f, 58f, 76f);
+            float buttonX = (Screen.width - buttonWidth) * 0.5f;
+            
+            float gap = hasMenuButtonSprites ? -buttonHeight * 0.45f : 8f; 
+            
+            float totalButtonHeight = buttonHeight * 2f + gap;
+            float targetButtonY = Screen.height * 0.07f;
+            float minButtonY = Screen.height * 0.02f;
+            float maxButtonY = Mathf.Max(minButtonY, Screen.height - totalButtonHeight - 8f);
+            float buttonY = Mathf.Clamp(targetButtonY, minButtonY, maxButtonY);
+
+            if (DrawSimpleImageButton(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), victoryRetryButtonTexture, "JOGAR NOVAMENTE"))
+            {
+                ResumeOrRestartGame();
+            }
+
+            if (DrawSimpleImageButton(new Rect(buttonX, buttonY + buttonHeight + gap, buttonWidth, buttonHeight), victoryHomeButtonTexture, "MENU INICIAL"))
+            {
+                LoadMainMenu();
+            }
+        }
+
+        public static void ShowGameOver()
+        {
+            if (instance != null)
+            {
+                instance.state = MenuState.GameOver;
+                Time.timeScale = 0f;
+                CrashClimbAudio2D.PlayMainMenuMusic();
+                gameplayRequested = false;
             }
         }
 
@@ -213,7 +295,15 @@ namespace CrashClimb
 
         private void DrawBackdrop()
         {
-            Texture2D backdrop = menuBackgroundTexture != null ? menuBackgroundTexture : skyTexture != null ? skyTexture : backgroundTexture;
+            Texture2D backdrop = null;
+            if (state == MenuState.GameOver) backdrop = deathBackgroundTexture;
+            else if (state == MenuState.Victory) backdrop = victoryBackgroundTexture;
+            
+            if (backdrop == null)
+            {
+                backdrop = menuBackgroundTexture != null ? menuBackgroundTexture : skyTexture != null ? skyTexture : backgroundTexture;
+            }
+
             if (backdrop != null)
             {
                 GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), backdrop, ScaleMode.ScaleAndCrop);
@@ -259,6 +349,26 @@ namespace CrashClimb
             bool isHovering = rect.Contains(Event.current.mousePosition);
             GUI.color = isHovering ? new Color(1f, 1f, 0.93f, 1f) : Color.white;
             GUI.DrawTextureWithTexCoords(rect, texture, MenuButtonTextureCrop, true);
+            GUI.color = previousColor;
+
+            previousColor = GUI.color;
+            GUI.color = Color.clear;
+            bool clicked = GUI.Button(rect, GUIContent.none);
+            GUI.color = previousColor;
+            return clicked;
+        }
+
+        private bool DrawSimpleImageButton(Rect rect, Texture2D texture, string fallbackLabel)
+        {
+            if (texture == null)
+            {
+                return DrawPlatformButton(rect, fallbackLabel);
+            }
+
+            Color previousColor = GUI.color;
+            bool isHovering = rect.Contains(Event.current.mousePosition);
+            GUI.color = isHovering ? new Color(1f, 1f, 0.93f, 1f) : Color.white;
+            GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, true);
             GUI.color = previousColor;
 
             previousColor = GUI.color;
@@ -334,7 +444,7 @@ namespace CrashClimb
             DrawRect(new Rect(rect.x, rect.y, rect.width, Mathf.Max(4f, rect.height * 0.22f)), new Color(0.6f, 0.52f, 0.4f, 0.5f));
         }
 
-        private void StartGame(bool rebuildMap)
+        private void StartGame()
         {
             gameplayRequested = true;
 
@@ -347,19 +457,27 @@ namespace CrashClimb
                 return;
             }
 
-            if (rebuildMap)
+            state = MenuState.Playing;
+            Time.timeScale = 1f;
+            CrashClimbAudio2D.PlayGameplayMusic();
+        }
+
+        private void ResumeOrRestartGame()
+        {
+            gameplayRequested = true;
+
+            if (SceneManager.GetActiveScene().name != GameplaySceneName)
             {
-                CrashClimbProceduralMap2D map = Object.FindFirstObjectByType<CrashClimbProceduralMap2D>();
-                if (map != null)
-                {
-                    map.Build();
-                }
+                state = MenuState.Playing;
+                Time.timeScale = 1f;
+                CrashClimbAudio2D.PlayGameplayMusic();
+                SceneManager.LoadScene(GameplaySceneName);
+                return;
             }
-            else
-            {
-                CrashClimbPlayerController2D player = Object.FindFirstObjectByType<CrashClimbPlayerController2D>();
-                player?.ResetToSpawn();
-            }
+
+            // Reset the player to spawn without rebuilding the map
+            CrashClimbPlayerController2D player = Object.FindFirstObjectByType<CrashClimbPlayerController2D>();
+            player?.ResetToSpawn();
 
             state = MenuState.Playing;
             Time.timeScale = 1f;
@@ -440,6 +558,12 @@ namespace CrashClimb
             playButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu");
             creditsButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-creditos");
             exitButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-sair");
+            deathBackgroundTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-morte");
+            retryButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/meno-morte-rejogar");
+            homeButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-morte-inicio");
+            victoryBackgroundTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-vitoria");
+            victoryRetryButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-vitoria-rejogar");
+            victoryHomeButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-vitoria-inicio");
             platformSprite = Resources.Load<Sprite>("CrashClimb/Pads/Pad_1_1");
         }
 

@@ -12,6 +12,7 @@ namespace CrashClimb
         [SerializeField] private Vector2 platformSize = new Vector2(2.65f, 0.34f);
         [Tooltip("Builds only when this map has no children, so manual scene edits are preserved.")]
         [SerializeField] private bool buildOnStart = true;
+        [SerializeField] private bool teleportToSpawnOnStart = true;
         [SerializeField] private int levelDesignVersion;
 
         [Header("Player")]
@@ -85,9 +86,62 @@ namespace CrashClimb
             {
                 CrashClimbBootstrap2D.EnsureRuntimeObjects();
 
-                if (buildOnStart && transform.childCount == 0)
+                // Respect the editor's generated map and modifications.
+                // We only need to ensure the player starts at the spawn point.
+                CrashClimbPlayerController2D player = Object.FindAnyObjectByType<CrashClimbPlayerController2D>();
+                if (player != null)
+                {
+                    if (teleportToSpawnOnStart)
+                    {
+                        player.SetSpawnPosition(playerSpawn);
+                        player.ResetToSpawn();
+                    }
+                    AttachCamera(player);
+                }
+                else if (transform.childCount == 0)
                 {
                     Build();
+                }
+
+                // Fix the goal platform: ensure it's physical and has the goal component.
+                // Old builds may have left a separate "Goal Trigger" object that stole collision.
+                EnsureGoalPlatformSetup();
+            }
+        }
+
+        private void EnsureGoalPlatformSetup()
+        {
+            // Destroy any leftover "Goal Trigger" objects from old builds
+            foreach (Transform child in transform)
+            {
+                if (child.name == "Goal Trigger")
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+
+            // Find the goal platform and ensure it's properly set up
+            foreach (Transform child in transform)
+            {
+                if (child.name.Contains("Goal") && child.name.Contains("Pad"))
+                {
+                    // Ensure it has a physical collider
+                    BoxCollider2D collider = child.GetComponent<BoxCollider2D>();
+                    if (collider == null)
+                    {
+                        collider = child.gameObject.AddComponent<BoxCollider2D>();
+                    }
+                    collider.isTrigger = false;
+
+                    // Ensure it has the goal detection component
+                    CrashClimbGoal2D goal = child.GetComponent<CrashClimbGoal2D>();
+                    if (goal == null)
+                    {
+                        child.gameObject.AddComponent<CrashClimbGoal2D>();
+                    }
+
+                    Debug.Log($"Goal platform '{child.name}' set up: collider.isTrigger={collider.isTrigger}, has CrashClimbGoal2D=true");
+                    break;
                 }
             }
         }
@@ -132,8 +186,11 @@ namespace CrashClimb
             }
 
             Vector2 goalPosition = new Vector2(0f, TotalHeight);
-            CreatePlatform("Goal - Pad_5_1", goalPosition, new Vector2(5f, 0.5f), CrashClimbSurfaceKind.Crystal, "CrashClimb/Pads/New/Pad_5_1");
-            CreateGoalTrigger(goalPosition + Vector2.up * 0.85f);
+            CreatePlatform("Goal - Pad 5_1", goalPosition, new Vector2(5f, 0.5f), CrashClimbSurfaceKind.Crystal, "CrashClimb/Pads/New/Pad_5_1");
+            
+            // Create a ceiling above the goal to prevent hitting map limits
+            CreateCeiling(goalPosition + Vector2.up * 4.5f);
+            
             CrashClimbPlayerController2D player = CreatePlayer();
             AttachCamera(player);
         }
@@ -403,17 +460,14 @@ namespace CrashClimb
             spike.AddComponent<CrashClimbSpikeHazard2D>();
         }
 
-        private void CreateGoalTrigger(Vector2 position)
+        private void CreateCeiling(Vector2 position)
         {
-            GameObject goalTrigger = new GameObject("Goal Trigger");
-            goalTrigger.transform.SetParent(transform);
-            goalTrigger.transform.position = position;
+            GameObject ceiling = new GameObject("Map Ceiling");
+            ceiling.transform.SetParent(transform);
+            ceiling.transform.position = position;
 
-            BoxCollider2D collider = goalTrigger.AddComponent<BoxCollider2D>();
-            collider.size = new Vector2(4.6f, 1.4f);
-            collider.isTrigger = true;
-
-            goalTrigger.AddComponent<CrashClimbGoal2D>();
+            BoxCollider2D collider = ceiling.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(towerHalfWidth * 2.5f, 1f);
         }
 
         private bool ShouldPlaceSpike(int index, LevelZone zone)
