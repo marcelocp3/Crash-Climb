@@ -23,6 +23,7 @@ namespace CrashClimb
         private const string MainMenuSceneName = "MainMenu";
         private const string GameplaySceneName = "Main";
         private const string GameCompleteSceneName = "GameComplete";
+        private const string MenuCameraName = "Crash Climb Menu Camera";
         private static readonly Rect MenuButtonTextureCrop = new Rect(0.06f, 0.27f, 0.88f, 0.48f);
         private static bool gameplayRequested;
         private bool wasPlaying;
@@ -49,6 +50,7 @@ namespace CrashClimb
         private Texture2D victoryRetryButtonTexture;
         private Texture2D victoryHomeButtonTexture;
         private Sprite platformSprite;
+        private Camera menuCamera;
 
         public static bool IsBlockingHud => instance != null && instance.state != MenuState.Playing;
 
@@ -64,7 +66,9 @@ namespace CrashClimb
             DontDestroyOnLoad(gameObject);
             LoadTextures();
             EnsureWhiteTexture();
+            EnsureMenuCameraExists();
             ApplySceneState(SceneManager.GetActiveScene().name);
+            UpdateMenuCameraState();
         }
 
         private void OnEnable()
@@ -128,6 +132,8 @@ namespace CrashClimb
                 wasPlaying = true;
                 Time.timeScale = 0f;
             }
+
+            UpdateMenuCameraState();
         }
 
         private void DrawMain(Rect panel)
@@ -453,6 +459,7 @@ namespace CrashClimb
                 state = MenuState.Playing;
                 Time.timeScale = 1f;
                 CrashClimbAudio2D.PlayGameplayMusic();
+                UpdateMenuCameraState();
                 SceneManager.LoadScene(GameplaySceneName);
                 return;
             }
@@ -460,6 +467,7 @@ namespace CrashClimb
             state = MenuState.Playing;
             Time.timeScale = 1f;
             CrashClimbAudio2D.PlayGameplayMusic();
+            UpdateMenuCameraState();
         }
 
         private void ResumeOrRestartGame()
@@ -471,6 +479,7 @@ namespace CrashClimb
                 state = MenuState.Playing;
                 Time.timeScale = 1f;
                 CrashClimbAudio2D.PlayGameplayMusic();
+                UpdateMenuCameraState();
                 SceneManager.LoadScene(GameplaySceneName);
                 return;
             }
@@ -482,6 +491,7 @@ namespace CrashClimb
             state = MenuState.Playing;
             Time.timeScale = 1f;
             CrashClimbAudio2D.PlayGameplayMusic();
+            UpdateMenuCameraState();
         }
 
         private void ShowVictory(CrashClimbPlayerController2D player)
@@ -490,6 +500,7 @@ namespace CrashClimb
             state = MenuState.Victory;
             Time.timeScale = 0f;
             CrashClimbAudio2D.PlayMainMenuMusic();
+            UpdateMenuCameraState();
 
             if (SceneManager.GetActiveScene().name != GameCompleteSceneName)
             {
@@ -503,6 +514,7 @@ namespace CrashClimb
             state = MenuState.Main;
             Time.timeScale = 0f;
             CrashClimbAudio2D.PlayMainMenuMusic();
+            UpdateMenuCameraState();
 
             if (SceneManager.GetActiveScene().name != MainMenuSceneName)
             {
@@ -513,6 +525,7 @@ namespace CrashClimb
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             ApplySceneState(scene.name);
+            UpdateMenuCameraState();
         }
 
         private void ApplySceneState(string sceneName)
@@ -529,6 +542,7 @@ namespace CrashClimb
                 {
                     CrashClimbAudio2D.PlayMainMenuMusic();
                 }
+                UpdateMenuCameraState();
                 return;
             }
 
@@ -537,6 +551,7 @@ namespace CrashClimb
                 state = MenuState.Victory;
                 Time.timeScale = 0f;
                 CrashClimbAudio2D.PlayMainMenuMusic();
+                UpdateMenuCameraState();
                 return;
             }
 
@@ -546,6 +561,67 @@ namespace CrashClimb
             {
                 Time.timeScale = 0f;
             }
+
+            UpdateMenuCameraState();
+        }
+
+        private void EnsureMenuCameraExists()
+        {
+            if (menuCamera != null)
+            {
+                return;
+            }
+
+            Transform existingCamera = transform.Find(MenuCameraName);
+            if (existingCamera != null)
+            {
+                menuCamera = existingCamera.GetComponent<Camera>();
+            }
+
+            if (menuCamera == null)
+            {
+                GameObject cameraObject = new GameObject(MenuCameraName);
+                cameraObject.transform.SetParent(transform, false);
+                menuCamera = cameraObject.AddComponent<Camera>();
+            }
+
+            menuCamera.clearFlags = CameraClearFlags.SolidColor;
+            menuCamera.backgroundColor = Color.black;
+            menuCamera.cullingMask = 0;
+            menuCamera.depth = -100f;
+            menuCamera.orthographic = true;
+            menuCamera.orthographicSize = 1f;
+            menuCamera.nearClipPlane = 0.01f;
+            menuCamera.farClipPlane = 1f;
+            menuCamera.targetDisplay = 0;
+        }
+
+        private void UpdateMenuCameraState()
+        {
+            EnsureMenuCameraExists();
+            if (menuCamera == null)
+            {
+                return;
+            }
+
+            menuCamera.enabled = !HasActiveDisplayCameraExcludingMenu();
+        }
+
+        private bool HasActiveDisplayCameraExcludingMenu()
+        {
+            Camera[] cameras = Camera.allCameras;
+            for (int i = 0; i < cameras.Length; i++)
+            {
+                Camera camera = cameras[i];
+                if (camera == null || camera == menuCamera || !camera.enabled || !camera.gameObject.activeInHierarchy || camera.targetDisplay != 0)
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         private void LoadTextures()
