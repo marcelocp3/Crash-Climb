@@ -61,7 +61,8 @@ namespace CrashClimb
             float fill = currentHealth / (float)maxHealth;
             float panelWidth = 230f;
             float panelHeight = 116f;
-            Rect panelRect = new Rect(screenOffset.x, screenOffset.y, panelWidth, panelHeight);
+            Rect safe = GetGuiSafeArea();
+            Rect panelRect = new Rect(safe.x + screenOffset.x, safe.y + screenOffset.y, panelWidth, panelHeight);
             DrawRect(panelRect, new Color(0.03f, 0.04f, 0.05f, 0.78f));
             DrawRect(new Rect(panelRect.x, panelRect.y, panelRect.width, 3f), new Color(0.75f, 0.32f, 1f, 0.9f));
 
@@ -98,6 +99,17 @@ namespace CrashClimb
             GUI.color = color;
             GUI.DrawTexture(rect, whiteTexture);
             GUI.color = previousColor;
+        }
+
+        private Rect GetGuiSafeArea()
+        {
+            Rect safe = Screen.safeArea;
+            if (safe.width <= 0f || safe.height <= 0f)
+            {
+                safe = new Rect(0f, 0f, Screen.width, Screen.height);
+            }
+
+            return new Rect(safe.x, Screen.height - safe.yMax, safe.width, safe.height);
         }
 
         private Color GetHealthColor(float fill)

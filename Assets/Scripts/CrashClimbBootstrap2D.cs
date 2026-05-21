@@ -33,8 +33,10 @@ namespace CrashClimb
 
         public static void EnsureRuntimeObjects()
         {
+            ApplyRuntimeMobileDefaults();
             CrashClimbAudio2D.EnsureExists();
             EnsureMainMenuExists();
+            EnsureMobileControlsExists();
 
             if (!IsGameplayScene(SceneManager.GetActiveScene().name))
             {
@@ -48,6 +50,28 @@ namespace CrashClimb
         private static bool IsGameplayScene(string sceneName)
         {
             return sceneName == GameplaySceneName;
+        }
+
+        private static void ApplyRuntimeMobileDefaults()
+        {
+            if (!Application.isMobilePlatform)
+            {
+                return;
+            }
+
+            Application.targetFrameRate = 60;
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        }
+
+        private static void EnsureMobileControlsExists()
+        {
+            if (Object.FindFirstObjectByType<CrashClimbMobileControls2D>() != null)
+            {
+                return;
+            }
+
+            GameObject controls = new GameObject("Crash Climb Mobile Controls");
+            controls.AddComponent<CrashClimbMobileControls2D>();
         }
 
         private static void EnsureMapExists()

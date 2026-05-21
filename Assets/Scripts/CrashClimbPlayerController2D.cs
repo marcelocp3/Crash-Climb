@@ -47,6 +47,8 @@ namespace CrashClimb
         [SerializeField] private float invulnerabilityTime = 0.4f;
         [SerializeField] private Transform respawnPoint;
         [SerializeField] private float fallDeathY = -18f;
+        [SerializeField] private float checkpointMinHeightGain = 5f;
+        [SerializeField] private float checkpointYOffset = 0.08f;
 
         [Header("Animation")]
         [SerializeField] private Animator animator;
@@ -71,6 +73,7 @@ namespace CrashClimb
         private float surfaceGravityMultiplier = 1f;
         private float surfaceGravityTimer;
         private Vector3 spawnPosition;
+        private float highestCheckpointY;
 
         public int CurrentHealth => currentHealth;
         public int MaxHealth => maxHealth;
@@ -91,6 +94,7 @@ namespace CrashClimb
             baseGravityScale = Mathf.Approximately(rb.gravityScale, 0f) ? 3f : rb.gravityScale;
             rb.gravityScale = baseGravityScale;
             spawnPosition = respawnPoint != null ? respawnPoint.position : transform.position;
+            highestCheckpointY = spawnPosition.y;
 
             // Force override — serialized scene values do not update from code defaults
             invulnerabilityTime = 0.08f;
@@ -100,6 +104,12 @@ namespace CrashClimb
         {
             if (isDead)
             {
+                return;
+            }
+
+            if (CrashClimbMainMenu2D.IsBlockingHud || Mathf.Approximately(Time.timeScale, 0f))
+            {
+                horizontalInput = 0f;
                 return;
             }
 
@@ -159,10 +169,30 @@ namespace CrashClimb
                 if (!wasGrounded && hasUpdatedGroundedState && currentSurface != null)
                 {
                     CrashClimbAudio2D.PlayLanding(currentSurface.Kind);
+                    TryUpdateCheckpoint(groundCollider);
                 }
             }
 
             hasUpdatedGroundedState = true;
+        }
+
+        private void TryUpdateCheckpoint(Collider2D groundCollider)
+        {
+            if (currentSurface == null || currentSurface.Kind == CrashClimbSurfaceKind.FragileRock)
+            {
+                return;
+            }
+
+            Bounds groundBounds = groundCollider.bounds;
+            float yOffset = bodyCollider != null ? bodyCollider.bounds.extents.y + checkpointYOffset : checkpointYOffset;
+            float checkpointY = groundBounds.max.y + yOffset;
+            if (checkpointY <= highestCheckpointY + checkpointMinHeightGain)
+            {
+                return;
+            }
+
+            spawnPosition = new Vector3(transform.position.x, checkpointY, transform.position.z);
+            highestCheckpointY = checkpointY;
         }
 
         private void HandleJumpInput()
@@ -192,22 +222,32 @@ namespace CrashClimb
 
         private bool JumpPressedThisFrame()
         {
-            return Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow);
+            return CrashClimbMobileControls2D.JumpPressedThisFrame
+                || Input.GetKeyDown(KeyCode.Space)
+                || Input.GetKeyDown(KeyCode.W)
+                || Input.GetKeyDown(KeyCode.UpArrow);
         }
 
         private bool JumpHeld()
         {
-            return Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow);
+            return CrashClimbMobileControls2D.JumpHeld
+                || Input.GetKey(KeyCode.Space)
+                || Input.GetKey(KeyCode.W)
+                || Input.GetKey(KeyCode.UpArrow);
         }
 
         private bool JumpReleasedThisFrame()
         {
-            return Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.W) || Input.GetKeyUp(KeyCode.UpArrow);
+            return CrashClimbMobileControls2D.JumpReleasedThisFrame
+                || Input.GetKeyUp(KeyCode.Space)
+                || Input.GetKeyUp(KeyCode.W)
+                || Input.GetKeyUp(KeyCode.UpArrow);
         }
 
         private float GetHorizontalInput()
         {
-            return Input.GetAxisRaw("Horizontal");
+            float touchInput = CrashClimbMobileControls2D.Horizontal;
+            return Mathf.Abs(touchInput) > 0.01f ? touchInput : Input.GetAxisRaw("Horizontal");
         }
 
         private void StartChargingJump()
@@ -277,7 +317,8 @@ namespace CrashClimb
 
         private void HandleAttackInput()
         {
-            if (!Input.GetButtonDown("Fire1") || Time.time < nextAttackTime)
+            bool attackPressed = CrashClimbMobileControls2D.AttackPressedThisFrame || Input.GetButtonDown("Fire1");
+            if (!attackPressed || Time.time < nextAttackTime)
             {
                 return;
             }
@@ -405,6 +446,7 @@ namespace CrashClimb
         public void SetSpawnPosition(Vector3 position)
         {
             spawnPosition = position;
+            highestCheckpointY = position.y;
         }
 
         public void ResetToSpawn()

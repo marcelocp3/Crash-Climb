@@ -24,9 +24,11 @@ namespace CrashClimb
         private const string GameplaySceneName = "Main";
         private const string GameCompleteSceneName = "GameComplete";
         private const string MenuCameraName = "Crash Climb Menu Camera";
+        private const string VolumePrefKey = "CrashClimb.MasterVolume";
         private static readonly Rect MenuButtonTextureCrop = new Rect(0.06f, 0.27f, 0.88f, 0.48f);
         private static bool gameplayRequested;
         private bool wasPlaying;
+        private float masterVolume = 1f;
 
         [SerializeField] private MenuState state = MenuState.Main;
         [SerializeField] private bool pauseOnStart = true;
@@ -65,6 +67,7 @@ namespace CrashClimb
             instance = this;
             DontDestroyOnLoad(gameObject);
             LoadTextures();
+            LoadPlayerPreferences();
             EnsureWhiteTexture();
             EnsureMenuCameraExists();
             ApplySceneState(SceneManager.GetActiveScene().name);
@@ -126,11 +129,9 @@ namespace CrashClimb
 
         private void Update()
         {
-            if (state == MenuState.Playing && Input.GetKeyDown(KeyCode.Escape))
+            if (Input.GetKeyDown(KeyCode.Escape) || CrashClimbMobileControls2D.PausePressedThisFrame)
             {
-                state = MenuState.Main;
-                wasPlaying = true;
-                Time.timeScale = 0f;
+                HandleBackOrPause();
             }
 
             UpdateMenuCameraState();
@@ -140,6 +141,7 @@ namespace CrashClimb
         {
             bool hasFinalBackground = menuBackgroundTexture != null;
             bool hasMenuButtonSprites = playButtonTexture != null && creditsButtonTexture != null && exitButtonTexture != null;
+            const int buttonCount = 4;
             float titleY = Mathf.Max(36f, Screen.height * 0.12f);
             if (!hasFinalBackground)
             {
@@ -155,22 +157,26 @@ namespace CrashClimb
             float buttonHeight = hasMenuButtonSprites ? Mathf.Clamp(buttonWidth * 0.26f, 60f, 84f) : Mathf.Clamp(Screen.height * 0.13f, 58f, 76f);
             float buttonX = (Screen.width - buttonWidth) * 0.5f;
             float gap = hasMenuButtonSprites ? Mathf.Clamp(Screen.height * 0.032f, 14f, 24f) : Mathf.Clamp(Screen.height * 0.025f, 10f, 18f);
-            float totalButtonHeight = buttonHeight * 3f + gap * 2f;
+            float totalButtonHeight = buttonHeight * buttonCount + gap * (buttonCount - 1);
             float targetButtonY = hasFinalBackground ? Screen.height * 0.405f : titleY + 104f;
-            float minButtonY = hasFinalBackground ? Mathf.Max(132f, Screen.height * 0.35f) : titleY + 82f;
+            float minButtonY = hasFinalBackground ? Mathf.Max(72f, Screen.height * 0.22f) : titleY + 82f;
+            float availableHeight = Mathf.Max(160f, Screen.height - minButtonY - 20f);
+            if (totalButtonHeight > availableHeight)
+            {
+                gap = Mathf.Clamp(gap * 0.55f, 6f, 12f);
+                buttonHeight = Mathf.Clamp((availableHeight - gap * (buttonCount - 1)) / buttonCount, 46f, buttonHeight);
+                totalButtonHeight = buttonHeight * buttonCount + gap * (buttonCount - 1);
+            }
+
             float maxButtonY = Mathf.Max(minButtonY, Screen.height - totalButtonHeight - 24f);
             float buttonY = Mathf.Clamp(targetButtonY, minButtonY, maxButtonY);
+            float rowStep = buttonHeight + gap;
 
             if (DrawMenuImageButton(new Rect(buttonX, buttonY, buttonWidth, buttonHeight), playButtonTexture, "JOGAR"))
             {
                 if (wasPlaying)
                 {
-                    // Resume from ESC pause — don't touch the player
-                    wasPlaying = false;
-                    gameplayRequested = true;
-                    state = MenuState.Playing;
-                    Time.timeScale = 1f;
-                    CrashClimbAudio2D.PlayGameplayMusic();
+                    ResumePausedGame();
                 }
                 else
                 {
@@ -178,12 +184,17 @@ namespace CrashClimb
                 }
             }
 
-            if (DrawMenuImageButton(new Rect(buttonX, buttonY + (buttonHeight + gap), buttonWidth, buttonHeight), creditsButtonTexture, "CRÉDITOS"))
+            if (DrawPlatformButton(new Rect(buttonX, buttonY + rowStep, buttonWidth, buttonHeight), "OPÇÕES"))
+            {
+                state = MenuState.Options;
+            }
+
+            if (DrawMenuImageButton(new Rect(buttonX, buttonY + rowStep * 2f, buttonWidth, buttonHeight), creditsButtonTexture, "CRÉDITOS"))
             {
                 state = MenuState.Credits;
             }
 
-            if (DrawMenuImageButton(new Rect(buttonX, buttonY + (buttonHeight + gap) * 2f, buttonWidth, buttonHeight), exitButtonTexture, "SAIR"))
+            if (DrawMenuImageButton(new Rect(buttonX, buttonY + rowStep * 3f, buttonWidth, buttonHeight), exitButtonTexture, "SAIR"))
             {
                 QuitGame();
             }
@@ -191,13 +202,42 @@ namespace CrashClimb
 
         private void DrawOptions(Rect panel)
         {
-            float titleY = Mathf.Max(46f, Screen.height * 0.16f);
+            float titleY = Mathf.Max(32f, Screen.height * 0.1f);
             GUI.Label(new Rect(0f, titleY, Screen.width, 64f), "OPÇÕES", titleStyle);
-            GUI.Label(new Rect(Screen.width * 0.5f - 220f, titleY + 82f, 440f, 70f), "Volume, controles e outras configuracoes podem ser expandidos aqui.", subtitleStyle);
 
-            float buttonWidth = Mathf.Min(300f, Screen.width - 56f);
-            if (DrawPlatformButton(new Rect((Screen.width - buttonWidth) * 0.5f, titleY + 180f, buttonWidth, 68f), "VOLTAR"))
+            float panelWidth = Mathf.Min(520f, Screen.width - 48f);
+            float panelX = (Screen.width - panelWidth) * 0.5f;
+            float contentY = titleY + Mathf.Clamp(Screen.height * 0.14f, 70f, 100f);
+            Rect settingsPanel = new Rect(panelX, contentY, panelWidth, Mathf.Min(250f, Screen.height - contentY - 22f));
+            DrawRect(settingsPanel, new Color(0.03f, 0.04f, 0.05f, 0.68f));
+            DrawRect(new Rect(settingsPanel.x, settingsPanel.y, settingsPanel.width, 3f), new Color(0.75f, 0.32f, 1f, 0.9f));
+
+            float rowX = settingsPanel.x + 24f;
+            float rowWidth = settingsPanel.width - 48f;
+            float rowY = settingsPanel.y + 24f;
+
+            GUI.Label(new Rect(rowX, rowY, rowWidth, 24f), $"Volume {Mathf.RoundToInt(masterVolume * 100f)}%", subtitleStyle);
+            float newVolume = GUI.HorizontalSlider(new Rect(rowX, rowY + 36f, rowWidth, 28f), masterVolume, 0f, 1f);
+            if (!Mathf.Approximately(newVolume, masterVolume))
             {
+                masterVolume = newVolume;
+                AudioListener.volume = masterVolume;
+                PlayerPrefs.SetFloat(VolumePrefKey, masterVolume);
+            }
+
+            float buttonWidth = Mathf.Min(320f, rowWidth);
+            float buttonX = settingsPanel.x + (settingsPanel.width - buttonWidth) * 0.5f;
+            float buttonHeight = Mathf.Clamp(Screen.height * 0.09f, 48f, 62f);
+            string vibrationLabel = CrashClimbMobileControls2D.VibrationEnabled ? "VIBRA: LIGADA" : "VIBRA: DESLIGADA";
+            if (DrawPlatformButton(new Rect(buttonX, rowY + 82f, buttonWidth, buttonHeight), vibrationLabel))
+            {
+                CrashClimbMobileControls2D.VibrationEnabled = !CrashClimbMobileControls2D.VibrationEnabled;
+            }
+
+            if (DrawPlatformButton(new Rect(buttonX, rowY + 82f + buttonHeight + 14f, buttonWidth, buttonHeight), "VOLTAR"))
+            {
+                PlayerPrefs.SetFloat(VolumePrefKey, masterVolume);
+                PlayerPrefs.Save();
                 state = MenuState.Main;
             }
         }
@@ -286,6 +326,7 @@ namespace CrashClimb
             if (instance != null)
             {
                 instance.state = MenuState.GameOver;
+                instance.wasPlaying = false;
                 Time.timeScale = 0f;
                 CrashClimbAudio2D.PlayMainMenuMusic();
                 gameplayRequested = false;
@@ -294,6 +335,11 @@ namespace CrashClimb
 
         private void DrawPauseHint()
         {
+            if (CrashClimbMobileControls2D.ControlsVisible)
+            {
+                return;
+            }
+
             Rect hint = new Rect(Screen.width - 166f, 12f, 154f, 24f);
             DrawRect(hint, new Color(0.03f, 0.04f, 0.05f, 0.65f));
             GUI.Label(new Rect(hint.x + 10f, hint.y + 4f, hint.width - 20f, 18f), "Esc abre o menu", smallStyle);
@@ -332,10 +378,13 @@ namespace CrashClimb
             DrawPlatformButtonTexture(rect, isHovering ? new Color(1f, 1f, 0.94f, 1f) : Color.white);
 
             Color previousTextColor = buttonStyle.normal.textColor;
+            int previousFontSize = buttonStyle.fontSize;
+            buttonStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(rect.height * 0.42f), 16, previousFontSize);
             buttonStyle.normal.textColor = new Color(0.06f, 0.06f, 0.055f, 0.9f);
             GUI.Label(new Rect(rect.x + 8f, rect.y + rect.height * 0.14f + 3f, rect.width - 12f, rect.height * 0.52f), label, buttonStyle);
             buttonStyle.normal.textColor = previousTextColor;
             GUI.Label(new Rect(rect.x + 6f, rect.y + rect.height * 0.14f, rect.width - 12f, rect.height * 0.52f), label, buttonStyle);
+            buttonStyle.fontSize = previousFontSize;
 
             Color previousColor = GUI.color;
             GUI.color = Color.clear;
@@ -450,9 +499,49 @@ namespace CrashClimb
             DrawRect(new Rect(rect.x, rect.y, rect.width, Mathf.Max(4f, rect.height * 0.22f)), new Color(0.6f, 0.52f, 0.4f, 0.5f));
         }
 
+        private void HandleBackOrPause()
+        {
+            if (state == MenuState.Playing)
+            {
+                PauseGameplay();
+                return;
+            }
+
+            if (state == MenuState.Options || state == MenuState.Credits)
+            {
+                state = MenuState.Main;
+                return;
+            }
+
+            if (state == MenuState.Main && wasPlaying)
+            {
+                ResumePausedGame();
+            }
+        }
+
+        private void PauseGameplay()
+        {
+            state = MenuState.Main;
+            wasPlaying = true;
+            gameplayRequested = true;
+            Time.timeScale = 0f;
+            UpdateMenuCameraState();
+        }
+
+        private void ResumePausedGame()
+        {
+            wasPlaying = false;
+            gameplayRequested = true;
+            state = MenuState.Playing;
+            Time.timeScale = 1f;
+            CrashClimbAudio2D.PlayGameplayMusic();
+            UpdateMenuCameraState();
+        }
+
         private void StartGame()
         {
             gameplayRequested = true;
+            wasPlaying = false;
 
             if (SceneManager.GetActiveScene().name != GameplaySceneName)
             {
@@ -473,6 +562,7 @@ namespace CrashClimb
         private void ResumeOrRestartGame()
         {
             gameplayRequested = true;
+            wasPlaying = false;
 
             if (SceneManager.GetActiveScene().name != GameplaySceneName)
             {
@@ -497,6 +587,7 @@ namespace CrashClimb
         private void ShowVictory(CrashClimbPlayerController2D player)
         {
             gameplayRequested = false;
+            wasPlaying = false;
             state = MenuState.Victory;
             Time.timeScale = 0f;
             CrashClimbAudio2D.PlayMainMenuMusic();
@@ -511,6 +602,7 @@ namespace CrashClimb
         private void LoadMainMenu()
         {
             gameplayRequested = false;
+            wasPlaying = false;
             state = MenuState.Main;
             Time.timeScale = 0f;
             CrashClimbAudio2D.PlayMainMenuMusic();
@@ -641,6 +733,12 @@ namespace CrashClimb
             victoryRetryButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-vitoria-rejogar");
             victoryHomeButtonTexture = Resources.Load<Texture2D>("CrashClimb/Menu/menu-vitoria-inicio");
             platformSprite = Resources.Load<Sprite>("CrashClimb/Pads/Pad_1_1");
+        }
+
+        private void LoadPlayerPreferences()
+        {
+            masterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(VolumePrefKey, 1f));
+            AudioListener.volume = masterVolume;
         }
 
         private void QuitGame()

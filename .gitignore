@@ -7,6 +7,10 @@
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
+[Bb]uild_WebGL/
+[Bb]uild_Android/
+Assets/Settings/
+Assets/Settings.meta
 
 # Unity generated files
 *.pidb

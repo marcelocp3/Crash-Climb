@@ -6,6 +6,7 @@ Esse repositório será utilizado para o desenvolvimento de um jogo de categoria
 ## Integrantes:
 Marcelo da Costa Poltronieri e Raymond Lisbona
 
+
 ## Qual o gênero do jogo: 
 Jogo de plataforma
 
